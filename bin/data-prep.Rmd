@@ -31,16 +31,22 @@ N2 <- readxl::read_excel(
   na = 'NA')
 ```
 
+Merge the three data-frames to one gene expression (ge) data-frame.
+Remove unnecessary columnns.
+Focus on genes that underwent the multiple comparisons test (*Tested*)
 ```{r}
-AM %>% 
-  filter(`flag Treated vs untreated` == "Tested") %>%
-  select(`Gene ID`,
-         `gene name`,
-         baseMean,
-         `log2FoldChange Treated vs untreated`,
-         `padj Treated vs untreated`) %>%
+ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain')
+
+glimpse(ge) # Check the variables of the new data-frame
+
+ge %<>% 
+  dplyr::filter(`flag Treated vs untreated` == "Tested") %>%
+  dplyr::select(strain,
+                `Gene ID`,
+                `gene name`,
+                baseMean,
+                `log2FoldChange Treated vs untreated`,
+                `padj Treated vs untreated`) %>%
   arrange(`padj Treated vs untreated`)
-glimpse(AM)
-factor(AM$`flag Treated vs untreated`)
 ```
 
