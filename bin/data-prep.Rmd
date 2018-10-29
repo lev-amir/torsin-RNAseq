@@ -1,30 +1,46 @@
 ---
-title: "data-prep"
+title: "Data import and cleaning from .xlsx files sent by the Technion"
 author: "Amir Levine"
-date: "2018 M10 29"
-output: html_document
+date: "2018-10-29"
+output: md_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+Load tidyverse.
+```{r}
+if (!require(tidyverse)) {install.packages("tidyverse"); library(tidyverse)}
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+Import the gene expression data sent by Efrat from the Technion.
+Specifiy how to treat NA values.
+Specify the columns' data-types, as by default in loads all as characters.
+```{r}
+AM <- readxl::read_excel(
+  "raw/2018-10-25-Results_files/Final_results_AM140_treated_vs_untreated_.xlsx", 
+  col_names = TRUE, 
+  col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
+  na = 'NA')
+CL <- readxl::read_excel(
+  "raw/2018-10-25-Results_files/Final_results_CL2006_treated_vs_untreated_.xlsx",
+  col_names = TRUE, 
+  col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
+  na = 'NA')
+N2 <- readxl::read_excel(
+  "raw/2018-10-25-Results_files/Final_results_N2_treated_vs_untreated.xlsx",
+  col_names = TRUE, 
+  col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
+  na = 'NA')
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+AM %>% 
+  filter(`flag Treated vs untreated` == "Tested") %>%
+  select(`Gene ID`,
+         `gene name`,
+         baseMean,
+         `log2FoldChange Treated vs untreated`,
+         `padj Treated vs untreated`) %>%
+  arrange(`padj Treated vs untreated`)
+glimpse(AM)
+factor(AM$`flag Treated vs untreated`)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
