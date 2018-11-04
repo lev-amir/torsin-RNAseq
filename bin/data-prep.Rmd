@@ -5,6 +5,8 @@ date: "2018-10-29"
 output: md_document
 ---
 
+## Data Cleaning
+
 Load tidyverse.
 ```{r}
 if (!require(tidyverse)) {install.packages("tidyverse"); library(tidyverse)}
@@ -52,6 +54,121 @@ Remove individual strains data-frames.
 ```{r}
 rm(list = c("AM","CL","N2"))
 ```
+
+## Venn Diagram
+Load packages
+```{r}
+if (!require(VennDiagram)) {install.packages("VennDiagram"); library(VennDiagram)}
+if (!require(viridis)) {install.packages("viridis"); library(viridis)}
+```
+
+Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain.
+```{r}
+AM <- ge %>% 
+  filter(strain == "AM140",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` > 0) %>%
+  pull(`Gene ID`)
+
+CL <- ge %>% 
+  filter(strain == "CL2006",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` > 0) %>%
+  pull(`Gene ID`)
+
+N2<- ge %>% 
+  filter(strain == "N2",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` > 0) %>%
+  pull(`Gene ID`)
+```
+
+Visualize up- and down-regulated genes in the three strains.
+```{r}
+dir.create("results", showWarnings = FALSE)
+filename = "results/2018-11-04-venn_anc1_upregulated.tiff"
+title = "Upregulated (p < 0.1)"
+
+venn.diagram(
+  x = list(AM, CL, N2),
+  filename = filename,
+  category = c("AM140","CL2006","N2"),
+  resolution = 300,
+  imagetype = "tiff",
+  main = title,
+  main.cex = 3,
+  main.fontfamily = "sans",
+  fill = viridis(3),
+  cex = 2.5 ,# size of the areas’ labels
+  fontfamily = "sans", # the fontfamily of the areas’ labels
+  cat.cex = 2.5 ,#the size of the category names
+  cat.pos = c(0,0,0),
+  cat.dist = 0,
+  cat.fontfamily = "sans"
+  #print.mode = c("raw","percent")
+  #sub = "p < 0.0001",
+  #sub.cex = 2,
+  #sub.fontfamily = "sans"
+)
+```
+
+Obtain gene lists of downregulated genes (*p*-value < 0.1), for each strain.
+```{r}
+AM <- ge %>% 
+  filter(strain == "AM140",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` < 0) %>%
+  pull(`Gene ID`)
+
+CL <- ge %>% 
+  filter(strain == "CL2006",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` < 0) %>%
+  pull(`Gene ID`)
+
+N2<- ge %>% 
+  filter(strain == "N2",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` < 0) %>%
+  pull(`Gene ID`)
+```
+
+Visualize up- and down-regulated genes in the three strains.
+```{r}
+dir.create("results", showWarnings = FALSE)
+filename = "results/2018-11-04-venn_anc1_downregulated.tiff"
+title = "Downregulated (p < 0.1)"
+
+venn.diagram(
+  x = list(AM, CL, N2),
+  filename = filename,
+  category = c("AM140","CL2006","N2"),
+  resolution = 300,
+  imagetype = "tiff",
+  main = title,
+  main.cex = 3,
+  main.fontfamily = "sans",
+  fill = viridis(3),
+  cex = 2.5 ,# size of the areas’ labels
+  fontfamily = "sans", # the fontfamily of the areas’ labels
+  cat.cex = 2.5 ,#the size of the category names
+  cat.pos = c(0,0,0),
+  cat.dist = -0.05,
+  cat.fontfamily = "sans"
+)
+```
+
+Remove variables.
+```{r}
+rm(list = c("AM","CL","N2","filename","title"))
+```
+
+
+
+```{r}
+
+```
+
 
 
 ```{r}
