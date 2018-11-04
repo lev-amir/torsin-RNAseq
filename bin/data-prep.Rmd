@@ -34,12 +34,9 @@ N2 <- readxl::read_excel(
 Merge the three data-frames to one gene expression (ge) data-frame.
 Remove unnecessary columnns.
 Focus on genes that underwent the multiple comparisons test (*Tested*)
+Sort the dataframe by 
 ```{r}
-ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain')
-
-glimpse(ge) # Check the variables of the new data-frame
-
-ge %<>% 
+ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
   dplyr::filter(`flag Treated vs untreated` == "Tested") %>%
   dplyr::select(strain,
                 `Gene ID`,
@@ -47,6 +44,20 @@ ge %<>%
                 baseMean,
                 `log2FoldChange Treated vs untreated`,
                 `padj Treated vs untreated`) %>%
-  arrange(`padj Treated vs untreated`)
+  arrange(`padj Treated vs untreated`) %>%
+  group_by(strain)
 ```
+
+Remove individual strains data-frames.
+```{r}
+rm(list = c("AM","CL","N2"))
+```
+
+
+```{r}
+write(ge %>% filter(`padj Treated vs untreated` < 0.1) %>% pull(`Gene ID`) %>% unique(),
+      file = "a.txt")
+```
+
+
 
