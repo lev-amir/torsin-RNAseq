@@ -90,7 +90,7 @@ all.up <- unique(c(AM,CL,N2))
 save(AM,CL,N2,all.up,file = "data/venn-up.Rdata")
 ```
 
-Visualize up- and down-regulated genes in the three strains.
+Visualize up-regulated genes in the three strains.
 ```{r}
 dir.create("results", showWarnings = FALSE)
 filename = "results/2018-11-04-venn_anc1_upregulated.tiff"
@@ -109,9 +109,9 @@ venn.diagram(
   cex = 2.5 ,# size of the areas’ labels
   fontfamily = "sans", # the fontfamily of the areas’ labels
   cat.cex = 2.5 ,#the size of the category names
-  cat.pos = c(0,0,0),
-  cat.dist = 0,
-  cat.fontfamily = "sans"
+  cat.pos = c(0,45,0),
+  cat.dist = c(-.02,.05,-.04),
+  cat.fontfamily = "sans",
   #print.mode = c("raw","percent")
   #sub = "p < 0.0001",
   #sub.cex = 2,
@@ -145,7 +145,7 @@ all.dn <- unique(c(AM,CL,N2))
 save(AM,CL,N2,all.dn,file = "data/venn-dn.Rdata")
 ```
 
-Visualize up- and down-regulated genes in the three strains.
+Visualize down-regulated genes in the three strains.
 ```{r}
 dir.create("results", showWarnings = FALSE)
 filename = "results/2018-11-04-venn_anc1_downregulated.tiff"
