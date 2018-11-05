@@ -249,14 +249,22 @@ dev.off()
 ```
 
 ## Gene lists tables
+
+Focus on differentially expressed genes and rnename columns
 ```{r}
-ge %>% 
+tab <- ge %>% 
   filter(`Gene ID` %in% goi) %>% 
   rename(Gene_Name = `gene name`,
          Gene_ID = `Gene ID`,
          log2FC = `log2FoldChange Treated vs untreated`,
          FDR_adj_pvalue = `padj Treated vs untreated`) %>%
-  select(-baseMean) %>%
+  select(-baseMean)
+```
+
+
+Combined table for all three strains, up- and down-regulated genes.
+```{r}
+tab %>% 
   gather(score,quant,log2FC,FDR_adj_pvalue) %>%
   unite(score,strain,score,sep = "_") %>%
   spread(score,quant) %>%
@@ -264,14 +272,6 @@ ge %>%
          CL2006_log2FC,CL2006_FDR_adj_pvalue) %>% # Reorder columns
   write_excel_csv(path = "results/genes_list.csv")
 
-
-dat <- data_frame(
-    Person = rep(c("greg", "sally", "sue"), each=2),
-    Time = rep(c("Pre", "Post"), 3),
-    Score1 = round(rnorm(6, mean = 80, sd=4), 0),
-    Score2 = round(jitter(Score1, 15), 0),
-    Score3 = 5 + (Score1 + Score2)/2
-)
   
 ```
 
