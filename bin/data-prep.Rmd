@@ -56,13 +56,14 @@ rm(list = c("AM","CL","N2"))
 ```
 
 ## Venn Diagram
-Load packages
+Load packages.
 ```{r}
 if (!require(VennDiagram)) {install.packages("VennDiagram"); library(VennDiagram)}
 if (!require(viridis)) {install.packages("viridis"); library(viridis)}
 ```
 
 Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain.
+Combine all genes for heatmap.
 ```{r}
 AM <- ge %>% 
   filter(strain == "AM140",
@@ -81,6 +82,8 @@ N2<- ge %>%
          `padj Treated vs untreated` < 0.1,
          `log2FoldChange Treated vs untreated` > 0) %>%
   pull(`Gene ID`)
+
+all.up <- unique(c(AM,CL,N2))
 ```
 
 Visualize up- and down-regulated genes in the three strains.
@@ -113,6 +116,7 @@ venn.diagram(
 ```
 
 Obtain gene lists of downregulated genes (*p*-value < 0.1), for each strain.
+Combine all genes for heatmap.
 ```{r}
 AM <- ge %>% 
   filter(strain == "AM140",
@@ -131,6 +135,8 @@ N2<- ge %>%
          `padj Treated vs untreated` < 0.1,
          `log2FoldChange Treated vs untreated` < 0) %>%
   pull(`Gene ID`)
+
+all.dn <- unique(c(AM,CL,N2))
 ```
 
 Visualize up- and down-regulated genes in the three strains.
@@ -158,16 +164,80 @@ venn.diagram(
 )
 ```
 
-Remove variables.
+Remove variables used for Venn diagram.
 ```{r}
 rm(list = c("AM","CL","N2","filename","title"))
 ```
 
+## Heatmap of differentially expressed genes
 
-
+Up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r}
+goi <- union(all.up,all.dn)
+```
+
+Preapre fold-change values matrix of genes of interest.
+Import normalized counts.
+Covert to numerical matrix.
+Transform values to Z-score.
+```{r}
+norm <- read_csv("raw/2018-10-15-Results_files/normalized_counts.csv") %>% 
+  rename("gene_id" = X1) %>% filter(gene_id %in% goi)
+
+norm_mat <- as.matrix(norm[,5:27])
+rownames(norm_mat) <- norm$gene_id
+
+#z_mat <- scale(norm_mat, center = TRUE, scale = TRUE) # Scale by matrix
+z_mat <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat,MARGIN = 1,FUN = sd) # Z-score by row
+z_mat <- apply(norm_mat,MARGIN = 1,FUN = scale)
+#z_mat <- z_mat[!is.na(rowSums(z_mat)),]
+
+head(z_mat,20)
+```
+
+Load pacakges
+```{r}
+if (!require(gplots)) {install.packages("gplots"); library(gplots)}
+```
+
+Clustering
+```{r}
+rc <- z_mat %>% dist %>% hclust %>% as.dendrogram
+cc <- z_mat %>% t %>% dist %>% hclust %>% as.dendrogram
+```
+
+Plot heatmap
+https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/r/heatmap/
+https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/
+```{r}
+library("RColorBrewer")
+col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(256)) # Reverse so Blue is downregulated.
+col.lab <- brewer.pal(6, "Paired")
+
+heatmap.2(norm_mat, Rowv=T, Colv=F, col = col,
+          ColSideColors = c(rep(col.lab[1], 4), 
+                            rep(col.lab[2], 4), 
+                            rep(col.lab[3], 3), 
+                            rep(col.lab[4], 4), 
+                            rep(col.lab[5], 4), 
+                            rep(col.lab[6], 4)),
+          dendrogram = "row",
+          labRow = "",
+          scale = "row",
+          trace = "none", density.info = "none",
+          colsep = c(8,15),
+          keysize = 2
+          
+)
 
 ```
+
+## GO/GSEA analysis
+https://bioconductor.org/packages/release/bioc/html/topGO.html
+https://bioconductor.org/packages/3.7/bioc/html/clusterProfiler.html
+http://bioconductor.org/packages/release/bioc/html/gage.html
+http://software.broadinstitute.org/gsea/msigdb/collections.jsp
+https://bioconductor.org/packages/release/bioc/html/GSEABase.html
 
 
 
