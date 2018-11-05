@@ -50,8 +50,9 @@ ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
   group_by(strain)
 ```
 
-Remove individual strains data-frames.
+Save cleaned data-frames and remove individual strains data-frames.
 ```{r}
+save(AM,CL,N2,ge,file = "data/import-clean-ge.Rdata")
 rm(list = c("AM","CL","N2"))
 ```
 
@@ -64,6 +65,7 @@ if (!require(viridis)) {install.packages("viridis"); library(viridis)}
 
 Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain.
 Combine all genes for heatmap.
+Save data.
 ```{r}
 AM <- ge %>% 
   filter(strain == "AM140",
@@ -84,6 +86,8 @@ N2<- ge %>%
   pull(`Gene ID`)
 
 all.up <- unique(c(AM,CL,N2))
+
+save(AM,CL,N2,all.up,file = "data/venn-up.Rdata")
 ```
 
 Visualize up- and down-regulated genes in the three strains.
@@ -137,6 +141,8 @@ N2<- ge %>%
   pull(`Gene ID`)
 
 all.dn <- unique(c(AM,CL,N2))
+
+save(AM,CL,N2,all.dn,file = "data/venn-dn.Rdata")
 ```
 
 Visualize up- and down-regulated genes in the three strains.
@@ -171,6 +177,11 @@ rm(list = c("AM","CL","N2","filename","title"))
 
 ## Heatmap of differentially expressed genes
 
+Load pacakges
+```{r}
+if (!require(gplots)) {install.packages("gplots"); library(gplots)}
+```
+
 Up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r}
 goi <- union(all.up,all.dn)
@@ -188,16 +199,11 @@ norm_mat <- as.matrix(norm[,5:27])
 rownames(norm_mat) <- norm$gene_id
 
 #z_mat <- scale(norm_mat, center = TRUE, scale = TRUE) # Scale by matrix
-z_mat <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat,MARGIN = 1,FUN = sd) # Z-score by row
-z_mat <- apply(norm_mat,MARGIN = 1,FUN = scale)
+#z_mat1 <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat,MARGIN = 1,FUN = sd) # Z-score by row
+#z_mat2 <- apply(norm_mat,MARGIN = 1,FUN = scale)
 #z_mat <- z_mat[!is.na(rowSums(z_mat)),]
 
-head(z_mat,20)
-```
-
-Load pacakges
-```{r}
-if (!require(gplots)) {install.packages("gplots"); library(gplots)}
+save(goi,norm,norm_mat,file = "data/heatmap-up-dn.Rdata")
 ```
 
 Clustering
@@ -214,6 +220,7 @@ library("RColorBrewer")
 col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(256)) # Reverse so Blue is downregulated.
 col.lab <- brewer.pal(6, "Paired")
 
+svg(file = "results/heatmap.svg",width = 10, height = 8)
 heatmap.2(norm_mat, Rowv=T, Colv=F, col = col,
           ColSideColors = c(rep(col.lab[1], 4), 
                             rep(col.lab[2], 4), 
@@ -226,9 +233,10 @@ heatmap.2(norm_mat, Rowv=T, Colv=F, col = col,
           scale = "row",
           trace = "none", density.info = "none",
           colsep = c(8,15),
-          keysize = 2
-          
+          srtCol = 45,
+          keysize = 1
 )
+dev.off()
 
 ```
 
