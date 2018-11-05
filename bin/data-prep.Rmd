@@ -172,7 +172,7 @@ venn.diagram(
 
 Remove variables used for Venn diagram.
 ```{r}
-rm(list = c("AM","CL","N2","filename","title"))
+rm(list = c("filename","title"))
 ```
 
 ## Heatmap of differentially expressed genes
@@ -180,6 +180,7 @@ rm(list = c("AM","CL","N2","filename","title"))
 Load pacakges
 ```{r}
 if (!require(gplots)) {install.packages("gplots"); library(gplots)}
+library("RColorBrewer")
 ```
 
 Up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
@@ -212,14 +213,18 @@ rc <- z_mat %>% dist %>% hclust %>% as.dendrogram
 cc <- z_mat %>% t %>% dist %>% hclust %>% as.dendrogram
 ```
 
+Set colors for Heatmap
+```{r}
+col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(256)) # Reverse so Blue is downregulated.
+col.lab <- brewer.pal(6, "Paired")
+```
+
+
 Plot heatmap
 https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/r/heatmap/
 https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/
 ```{r}
-library("RColorBrewer")
-col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(256)) # Reverse so Blue is downregulated.
-col.lab <- brewer.pal(6, "Paired")
-
+dev.off()
 svg(file = "results/heatmap.svg",width = 10, height = 8)
 heatmap.2(norm_mat, Rowv=T, Colv=F, col = col,
           ColSideColors = c(rep(col.lab[1], 4), 
@@ -231,14 +236,45 @@ heatmap.2(norm_mat, Rowv=T, Colv=F, col = col,
           dendrogram = "row",
           labRow = "",
           scale = "row",
-          trace = "none", density.info = "none",
+          trace = "none",
+          density.info = "none",
           colsep = c(8,15),
           srtCol = 45,
-          keysize = 1
+          keysize = 1,
+          cexCol = 2,
+          margins = c(10,2),
+          key.par = list(cex = 1)
 )
 dev.off()
-
 ```
+
+## Gene lists tables
+```{r}
+ge %>% 
+  filter(`Gene ID` %in% goi) %>% 
+  rename(Gene_Name = `gene name`,
+         Gene_ID = `Gene ID`,
+         log2FC = `log2FoldChange Treated vs untreated`,
+         FDR_adj_pvalue = `padj Treated vs untreated`) %>%
+  select(-baseMean) %>%
+  gather(score,quant,log2FC,FDR_adj_pvalue) %>%
+  unite(score,strain,score,sep = "_") %>%
+  spread(score,quant) %>%
+  select(Gene_ID,Gene_Name,N2_log2FC,N2_FDR_adj_pvalue,AM140_log2FC,AM140_FDR_adj_pvalue,
+         CL2006_log2FC,CL2006_FDR_adj_pvalue) %>% # Reorder columns
+  write_excel_csv(path = "results/genes_list.csv")
+
+
+dat <- data_frame(
+    Person = rep(c("greg", "sally", "sue"), each=2),
+    Time = rep(c("Pre", "Post"), 3),
+    Score1 = round(rnorm(6, mean = 80, sd=4), 0),
+    Score2 = round(jitter(Score1, 15), 0),
+    Score3 = 5 + (Score1 + Score2)/2
+)
+  
+```
+
 
 ## GO/GSEA analysis
 https://bioconductor.org/packages/release/bioc/html/topGO.html
