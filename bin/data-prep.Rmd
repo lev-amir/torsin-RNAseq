@@ -111,11 +111,7 @@ venn.diagram(
   cat.cex = 2.5 ,#the size of the category names
   cat.pos = c(0,45,0),
   cat.dist = c(-.02,.05,-.04),
-  cat.fontfamily = "sans",
-  #print.mode = c("raw","percent")
-  #sub = "p < 0.0001",
-  #sub.cex = 2,
-  #sub.fontfamily = "sans"
+  cat.fontfamily = "sans"
 )
 ```
 
@@ -176,7 +172,6 @@ rm(list = c("filename","title"))
 ```
 
 ## Heatmap of differentially expressed genes
-
 Load pacakges
 ```{r}
 if (!require(gplots)) {install.packages("gplots"); library(gplots)}
@@ -270,10 +265,54 @@ tab %>%
   spread(score,quant) %>%
   select(Gene_ID,Gene_Name,N2_log2FC,N2_FDR_adj_pvalue,AM140_log2FC,AM140_FDR_adj_pvalue,
          CL2006_log2FC,CL2006_FDR_adj_pvalue) %>% # Reorder columns
-  write_excel_csv(path = "results/genes_list.csv")
-
-  
+  write_excel_csv(path = "results/gene_lists/genes_list.csv")
 ```
+
+Table for each strain, up- or down-regulated, individualy.
+```{r}
+# N2 upregulated
+tab %>% filter(strain == 'N2',
+               FDR_adj_pvalue < 0.1,
+               log2FC > 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/N2_upreg.csv")
+
+# N2 downregulated
+tab %>% filter(strain == 'N2',
+               FDR_adj_pvalue < 0.1,
+               log2FC < 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/N2_dnreg.csv")
+
+# AM140 upregulated
+tab %>% filter(strain == 'AM140',
+               FDR_adj_pvalue < 0.1,
+               log2FC > 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/AM140_upreg.csv")
+
+# AM140 downregulated
+tab %>% filter(strain == 'AM140',
+               FDR_adj_pvalue < 0.1,
+               log2FC < 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/AM140_dnreg.csv")
+  
+# CL2006 upregulated
+tab %>% filter(strain == 'CL2006',
+               FDR_adj_pvalue < 0.1,
+               log2FC > 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/CL2006_upreg.csv")
+
+# CL2006  downregulated
+tab %>% filter(strain == 'CL2006',
+               FDR_adj_pvalue < 0.1,
+               log2FC < 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/CL2006_dnreg.csv")
+```
+
 
 
 ## GO/GSEA analysis
