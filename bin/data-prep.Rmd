@@ -8,36 +8,41 @@ output: md_document
 ## Data Cleaning
 
 Load tidyverse.
-```{r}
-if (!require(tidyverse)) {install.packages("tidyverse"); library(tidyverse)}
+```{r packages, results='hide'}
+# Standalone R
+# if (!require(tidyverse)) {install.packages("tidyverse"); library(tidyverse)}
+
+# Conda R
+library(tidyverse)
+# Package needs to be install through the conda package manager
 ```
 
 Import the gene expression data sent by Efrat from the Technion.
 Specifiy how to treat NA values.
 Specify the columns' data-types, as by default in loads all as characters.
-```{r}
+```{r import-data}
 AM <- readxl::read_excel(
-  "raw/2018-10-25-Results_files/Final_results_AM140_treated_vs_untreated_.xlsx", 
+  path = "../raw/2018-10-25-Results_files/Final_results_AM140_treated_vs_untreated_.xlsx", 
   col_names = TRUE, 
   col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
   na = 'NA')
 CL <- readxl::read_excel(
-  "raw/2018-10-25-Results_files/Final_results_CL2006_treated_vs_untreated_.xlsx",
+  path = "../raw/2018-10-25-Results_files/Final_results_CL2006_treated_vs_untreated_.xlsx",
   col_names = TRUE, 
   col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
   na = 'NA')
 N2 <- readxl::read_excel(
-  "raw/2018-10-25-Results_files/Final_results_N2_treated_vs_untreated.xlsx",
+  path = "../raw/2018-10-25-Results_files/Final_results_N2_treated_vs_untreated.xlsx",
   col_names = TRUE, 
   col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
   na = 'NA')
 ```
 
-Merge the three data-frames to one gene expression (ge) data-frame.
-Remove unnecessary columnns.
-Focus on genes that underwent the multiple comparisons test (*Tested*)
-Sort the dataframe by 
-```{r}
+Merge the three strain specific dataframes to one gene expression (ge) dataframe.
+Remove unnecessary columns for further analysis.
+Focus on genes that underwent the multiple comparisons test (*Tested*).
+Sort the dataframe by the adjusted p-value.
+```{r process-data}
 ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
   dplyr::filter(`flag Treated vs untreated` == "Tested") %>%
   dplyr::select(strain,
@@ -50,23 +55,32 @@ ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
   group_by(strain)
 ```
 
-Save cleaned data-frames and remove individual strains data-frames.
-```{r}
+Save cleaned dataframes and remove individual strains data-frames (save checkpoint).
+```{r save-data}
 save(AM,CL,N2,ge,file = "data/import-clean-ge.Rdata")
 rm(list = c("AM","CL","N2"))
 ```
 
 ## Venn Diagram
 Load packages.
-```{r}
-if (!require(VennDiagram)) {install.packages("VennDiagram"); library(VennDiagram)}
-if (!require(viridis)) {install.packages("viridis"); library(viridis)}
+```{r packages}
+# Standalone
+# if (!require(VennDiagram)) {install.packages("VennDiagram"); library(VennDiagram)}
+# if (!require(viridis)) {install.packages("viridis"); library(viridis)}
+
+# Conda
+library(VennDiagram)
+```
+
+Load the clean dataframes (load checkpoint).
+```{r load-data}
+# load("data/import-clean-ge.Rdata")
 ```
 
 Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain.
-Combine all genes for heatmap.
+Create a gene-name vector to generate a heatmap.
 Save data.
-```{r}
+```{r get-upregulated}
 AM <- ge %>% 
   filter(strain == "AM140",
          `padj Treated vs untreated` < 0.1,
@@ -79,7 +93,7 @@ CL <- ge %>%
          `log2FoldChange Treated vs untreated` > 0) %>%
   pull(`Gene ID`)
 
-N2<- ge %>% 
+N2 <- ge %>% 
   filter(strain == "N2",
          `padj Treated vs untreated` < 0.1,
          `log2FoldChange Treated vs untreated` > 0) %>%
@@ -90,8 +104,8 @@ all.up <- unique(c(AM,CL,N2))
 save(AM,CL,N2,all.up,file = "data/venn-up.Rdata")
 ```
 
-Visualize up-regulated genes in the three strains.
-```{r}
+Visualize up-regulated genes in the three strains as a Venn diagram.
+```{r venn-upregulated}
 dir.create("results", showWarnings = FALSE)
 filename = "results/2018-11-04-venn_anc1_upregulated.tiff"
 title = "Upregulated (p < 0.1)"
