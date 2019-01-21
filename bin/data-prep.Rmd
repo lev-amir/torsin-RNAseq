@@ -5,6 +5,17 @@ date: "2018-10-29"
 output: md_document
 ---
 
+## Set parameters
+```{r parameters, results='hide'}
+if (!require(BiocManager)) {install.packages("BiocManager"); library(BiocManager)}
+
+today = Sys.Date()
+results_dir = "../results/"
+data_dir = "../data/"
+raw_data_dir = "../raw"
+```
+
+
 ## Data Cleaning
 
 Load tidyverse.
@@ -137,10 +148,10 @@ library(viridis)
 
 Visualize up-regulated genes in the three strains as a Venn diagram.
 ```{r venn-upregulated}
-load("data/up.Rdata")
+load("../data/up.Rdata")
 
-dir.create("results", showWarnings = FALSE)
-filename = "results/2018-11-04-venn_anc1_upregulated.tiff"
+dir.create("../results", showWarnings = FALSE)
+filename = "../results/2018-11-04-venn_anc1_upregulated.tiff"
 title = "Upregulated (p < 0.1)"
 
 venn.diagram(
@@ -164,10 +175,10 @@ venn.diagram(
 
 Visualize down-regulated genes in the three strains.
 ```{r venn-downregulated}
-load("data/dn.Rdata")
+load("../data/dn.Rdata")
 
-dir.create("results", showWarnings = FALSE)
-filename = "results/2018-11-04-venn_anc1_downregulated.tiff"
+dir.create("../results", showWarnings = FALSE)
+filename = "../results/2018-11-04-venn_anc1_downregulated.tiff"
 title = "Downregulated (p < 0.1)"
 
 venn.diagram(
@@ -207,72 +218,114 @@ library(RColorBrewer)
 
 Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r pool-regulated}
+load("../data/up.Rdata")
+load("../data/dn.Rdata")
 goi <- union(all.up,all.dn)
 ```
 
-Preapre fold-change values matrix of genes of interest.
-Import normalized counts.
-Covert to numerical matrix.
-Transform values to Z-score.
-```{r}
-norm <- read_csv("raw/2018-10-15-Results_files/normalized_counts.csv") %>% 
+Create a fold-change values matrix of genes of interest.
+Import normalized counts of differentially expressed genes.
+Covert the counts to a numerical matrix, and names the genes.
+```{r import-reads, results='hide'}
+norm <- read_csv("../raw/2018-10-15-Results_files/normalized_counts.csv") %>% 
   rename("gene_id" = X1) %>% filter(gene_id %in% goi)
 
+# Numerical Matrix of reads-only.
 norm_mat <- as.matrix(norm[,5:27])
+
+# Name the genes
 rownames(norm_mat) <- norm$gene_id
+```
 
-#z_mat <- scale(norm_mat, center = TRUE, scale = TRUE) # Scale by matrix
-#z_mat1 <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat,MARGIN = 1,FUN = sd) # Z-score by row
-#z_mat2 <- apply(norm_mat,MARGIN = 1,FUN = scale)
-#z_mat <- z_mat[!is.na(rowSums(z_mat)),]
+Transform values to Z-score by gene (row)
+```{r, results='hide'}
+z_mat <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat, MARGIN = 1,FUN = sd) # Z-score by row
 
-save(goi,norm,norm_mat,file = "data/heatmap-up-dn.Rdata")
+save(goi,norm_mat,z_mat,file = "../data/heatmap.Rdata")
 ```
 
 Clustering
-```{r}
+```{r h-clustering}
 rc <- z_mat %>% dist %>% hclust %>% as.dendrogram
 cc <- z_mat %>% t %>% dist %>% hclust %>% as.dendrogram
 ```
 
-Set colors for Heatmap
-```{r}
+Set colors for Heatmap, 256 colors in the scale.
+```{r color-scale}
 col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(256)) # Reverse so Blue is downregulated.
 col.lab <- brewer.pal(6, "Paired")
 ```
 
-
 Plot heatmap
 https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/r/heatmap/
 https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/
-```{r}
-dev.off()
-svg(file = "results/heatmap.svg",width = 10, height = 8)
-heatmap.2(norm_mat, Rowv=T, Colv=F, col = col,
+```{r plot-heatmap}
+# dev.off()
+svg(file = paste0(results_dir,today,"-heatmap.svg",
+                  width = 8.5, 
+                  height = 11.5,
+                  pointsize = 7))
+
+heatmap.2(x = z_mat, # data
+
+          # Colors
+          colsep = c(8,15), # Separate columns by strain
+          
+          col = col, # cell colors
+          # Color samples by treatment and strain
           ColSideColors = c(rep(col.lab[1], 4), 
                             rep(col.lab[2], 4), 
                             rep(col.lab[3], 3), 
                             rep(col.lab[4], 4), 
                             rep(col.lab[5], 4), 
                             rep(col.lab[6], 4)),
-          dendrogram = "row",
-          labRow = "",
-          scale = "row",
-          trace = "none",
-          density.info = "none",
-          colsep = c(8,15),
-          srtCol = 45,
-          keysize = 1,
-          cexCol = 2,
-          margins = c(10,2),
-          key.par = list(cex = 1)
-)
+          trace = "none", # Remove the cyan trace on the cells
+          density.info = "none", # Remove the density curve in legend
+          
+          # Sizes
+          keysize = 1.05, # Color legend key size
+          key.par = list(cex = 0.7), # Color scale legend font
+          
+          # Labels
+          labRow = "", # Label of rows
+          srtCol = 30, # Angle column labels.
+          key.title = "Gene Expression (Z-score)",
+          main = "Genes Regulated by Torsin RNAi",
+          ylab = "Genes",
+          xlab = "Samples",
+          
+          # Clustering
+          Rowv=rc, # row dendogram
+          Colv=F, # don't reorder columns
+          dendrogram = "row", # draw only row dendogram
+          
+          margins = c(6,2)
+          
+          )
+
 dev.off()
 ```
 
+# Analyze gene annotations
+
+## Fetch attributes from BioMaRt
+```{r packages}
+if (!require(biomaRt)) {BiocManager::install("biomaRt"); library(biomaRt)}
+if (!require(org.Ce.eg.db)) {BiocManager::install("org.Ce.eg.db"); library(org.Ce.eg.db)}
+```
+
+
+## Gene Set Enrichment Analysis (GSEA)
+Load packages
+```{r packages, results='hide'}
+
+```
+
+
+
 ## Gene lists tables
 
-Focus on differentially expressed genes and rnename columns
+Focus on differentially expressed genes and renname columns
 ```{r}
 tab <- ge %>% 
   filter(`Gene ID` %in% goi) %>% 
