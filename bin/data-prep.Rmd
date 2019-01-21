@@ -57,20 +57,12 @@ ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
 
 Save cleaned dataframes and remove individual strains data-frames (save checkpoint).
 ```{r save-data}
-save(AM,CL,N2,ge,file = "data/import-clean-ge.Rdata")
+save(AM,CL,N2,ge,
+     file = "../data/import-clean-ge.Rdata")
 rm(list = c("AM","CL","N2"))
 ```
 
-## Venn Diagram
-Load packages.
-```{r packages}
-# Standalone
-# if (!require(VennDiagram)) {install.packages("VennDiagram"); library(VennDiagram)}
-# if (!require(viridis)) {install.packages("viridis"); library(viridis)}
-
-# Conda
-library(VennDiagram)
-```
+## Data preparation
 
 Load the clean dataframes (load checkpoint).
 ```{r load-data}
@@ -101,11 +93,52 @@ N2 <- ge %>%
 
 all.up <- unique(c(AM,CL,N2))
 
-save(AM,CL,N2,all.up,file = "data/venn-up.Rdata")
+save(AM,CL,N2,all.up,file = "../data/up.Rdata")
+```
+
+Obtain gene lists of downregulated genes (*p*-value < 0.1), for each strain.
+Combine all genes for heatmap.
+```{r get-downregulated}
+AM <- ge %>% 
+  filter(strain == "AM140",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` < 0) %>%
+  pull(`Gene ID`)
+
+CL <- ge %>% 
+  filter(strain == "CL2006",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` < 0) %>%
+  pull(`Gene ID`)
+
+N2<- ge %>% 
+  filter(strain == "N2",
+         `padj Treated vs untreated` < 0.1,
+         `log2FoldChange Treated vs untreated` < 0) %>%
+  pull(`Gene ID`)
+
+all.dn <- unique(c(AM,CL,N2))
+
+save(AM,CL,N2,all.dn,file = "../data/dn.Rdata")
+```
+
+## Venn Diagram
+
+Load packages
+```{r packages, results='hide'}
+# Standalone
+if (!require(VennDiagram)) {install.packages("VennDiagram"); library(VennDiagram)}
+if (!require(viridis)) {install.packages("viridis"); library(viridis)}
+
+# Conda
+library(VennDiagram)
+library(viridis)
 ```
 
 Visualize up-regulated genes in the three strains as a Venn diagram.
 ```{r venn-upregulated}
+load("data/up.Rdata")
+
 dir.create("results", showWarnings = FALSE)
 filename = "results/2018-11-04-venn_anc1_upregulated.tiff"
 title = "Upregulated (p < 0.1)"
@@ -129,34 +162,10 @@ venn.diagram(
 )
 ```
 
-Obtain gene lists of downregulated genes (*p*-value < 0.1), for each strain.
-Combine all genes for heatmap.
-```{r}
-AM <- ge %>% 
-  filter(strain == "AM140",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` < 0) %>%
-  pull(`Gene ID`)
-
-CL <- ge %>% 
-  filter(strain == "CL2006",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` < 0) %>%
-  pull(`Gene ID`)
-
-N2<- ge %>% 
-  filter(strain == "N2",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` < 0) %>%
-  pull(`Gene ID`)
-
-all.dn <- unique(c(AM,CL,N2))
-
-save(AM,CL,N2,all.dn,file = "data/venn-dn.Rdata")
-```
-
 Visualize down-regulated genes in the three strains.
-```{r}
+```{r venn-downregulated}
+load("data/dn.Rdata")
+
 dir.create("results", showWarnings = FALSE)
 filename = "results/2018-11-04-venn_anc1_downregulated.tiff"
 title = "Downregulated (p < 0.1)"
@@ -181,19 +190,23 @@ venn.diagram(
 ```
 
 Remove variables used for Venn diagram.
-```{r}
+```{r clean-venn}
 rm(list = c("filename","title"))
 ```
 
 ## Heatmap of differentially expressed genes
+
 Load pacakges
-```{r}
+```{r packages, results='hide'}
+# Standalone
 if (!require(gplots)) {install.packages("gplots"); library(gplots)}
-library("RColorBrewer")
+if (!require(RColorBrewer)) {install.packages("RColorBrewer"); library(RColorBrewer)}
+# Conda
+library(RColorBrewer)
 ```
 
-Up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
-```{r}
+Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
+```{r pool-regulated}
 goi <- union(all.up,all.dn)
 ```
 
