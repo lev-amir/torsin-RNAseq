@@ -8,36 +8,21 @@ output: md_document
 
 ## Set parameters
 ```{r parameters, results='hide'}
-if (!require(BiocManager)) {install.packages("BiocManager"); library(BiocManager)}
-
 today = Sys.Date()
 results_dir = "../results/"
 data_dir = "../data/"
 raw_data_dir = "../raw"
 ```
 
-
-## Data Cleaning
-
-Load tidyverse.
+## Import Packages
 ```{r packages, results='hide'}
-# Standalone R
-# if (!require(tidyverse)) {install.packages("tidyverse"); library(tidyverse)}
-
-# Conda R
-library(tidyverse)
-# Package needs to be install through the conda package manager
-
-library(biomaRt)
-
-
-library(org.Ce.eg.db)
-
-library(fgsea)
-
+packages <- c("BiocManager","tidyverse","biomaRt","org.Ce.eg.db","fgsea")
+install.packages(packages) # Install packages
+lapply(packages, require, character.only = TRUE) # Load packages
 ```
 
-Import the gene expression data sent by Efrat from the Technion.
+## Data Cleaning
+Import the gene expression data sent by the Technion.
 Specifiy how to treat NA values.
 Specify the columns' data-types, as by default in loads all as characters.
 ```{r import-data}
