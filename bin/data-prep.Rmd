@@ -22,9 +22,7 @@ lapply(packages, require, character.only = TRUE) # Load packages
 ```
 
 ## Data Cleaning
-Import the gene expression data sent by the Technion.
-Specifiy how to treat NA values.
-Specify the columns' data-types, as by default in loads all as characters.
+Import the gene expression data sent by the Technion. Specifiy how to treat NA values. Specify the columns' data-types, since the default loads all as characters.
 ```{r import-data}
 AM <- readxl::read_excel(
   path = "../raw/2018-10-25-Results_files/Final_results_AM140_treated_vs_untreated_.xlsx", 
