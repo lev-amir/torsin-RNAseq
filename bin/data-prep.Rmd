@@ -24,6 +24,9 @@ lapply(packages, require, character.only = TRUE) # Load packages
 ```
 
 # Data Cleaning
+
+## Import data
+
 Import the gene expression data sent by the Technion. Specifiy how to treat NA values. Specify the columns' data-types, since the default loads all as characters. 
 ```{r import-data}
 AM <- readxl::read_excel(
@@ -43,11 +46,9 @@ N2 <- readxl::read_excel(
   na = 'NA')
 ```
 
-## Merge Strains
-Merge the three strain specific dataframes to one gene expression (ge) dataframe.
-Remove unnecessary columns for further analysis.
-Focus on genes that underwent the multiple comparisons test (*Tested*).
-Sort the dataframe by the adjusted p-value.
+## Merge strains (tested genes only)
+
+Merge the three strain specific dataframes to one gene expression (ge) dataframe. Remove unnecessary columns for further analysis. Focus on genes that underwent the multiple comparisons test (*Tested*). Sort the dataframe by the adjusted p-value.
 ```{r process-data}
 ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
   dplyr::filter(`flag Treated vs untreated` == "Tested") %>%
@@ -61,12 +62,16 @@ ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
   group_by(strain)
 ```
 
+## Save clean data
+
 Save cleaned dataframes and remove individual strains data-frames (save checkpoint).
 ```{r save-data}
 save(AM,CL,N2,ge,
      file = "../data/import-clean-ge.Rdata")
 rm(list = c("AM","CL","N2"))
 ```
+
+**STOPPED HERE**
 
 ## Generate Gene Lists
 Used in Venn diagram and Heatmap
@@ -303,6 +308,8 @@ dev.off()
 ```
 
 # Analyze gene annotations
+
+**Note that the current `ge` filters only the genes that were tested.**
 
 ## Fetch attributes from BioMaRt
 ```{r packages}
