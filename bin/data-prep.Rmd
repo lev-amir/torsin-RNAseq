@@ -1,5 +1,6 @@
 ---
-title: "Data import and cleaning from .xlsx files sent by the Technion"
+title: "Analysis of the effect of TorsinA RNAi on proteotoxicity expressing C. elegans"
+description: "Analysis of the CEL-Seq2 results received by the Technion"
 author: "Amir Levine"
 date: "2018-10-29"
 output: md_document
@@ -26,6 +27,14 @@ Load tidyverse.
 # Conda R
 library(tidyverse)
 # Package needs to be install through the conda package manager
+
+library(biomaRt)
+
+
+library(org.Ce.eg.db)
+
+library(fgsea)
+
 ```
 
 Import the gene expression data sent by Efrat from the Technion.
@@ -49,6 +58,7 @@ N2 <- readxl::read_excel(
   na = 'NA')
 ```
 
+## Merge
 Merge the three strain specific dataframes to one gene expression (ge) dataframe.
 Remove unnecessary columns for further analysis.
 Focus on genes that underwent the multiple comparisons test (*Tested*).
@@ -73,7 +83,8 @@ save(AM,CL,N2,ge,
 rm(list = c("AM","CL","N2"))
 ```
 
-## Data preparation
+## Generate Gene Lists
+Used in Venn diagram and Heatmap
 
 Load the clean dataframes (load checkpoint).
 ```{r load-data}
@@ -395,19 +406,446 @@ tab %>% filter(strain == 'CL2006',
 
 
 
-## GO/GSEA analysis
-https://bioconductor.org/packages/release/bioc/html/topGO.html
-https://bioconductor.org/packages/3.7/bioc/html/clusterProfiler.html
-http://bioconductor.org/packages/release/bioc/html/gage.html
-http://software.broadinstitute.org/gsea/msigdb/collections.jsp
-https://bioconductor.org/packages/release/bioc/html/GSEABase.html
-
-
-
 ```{r}
 write(ge %>% filter(`padj Treated vs untreated` < 0.1) %>% pull(`Gene ID`) %>% unique(),
       file = "a.txt")
 ```
 
 
+# Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
+
+## Load datasets
+
+Load the clean dataframes (load checkpoint).
+```{r load-data-gsea}
+load("data/import-clean-ge.Rdata", verbose = TRUE)
+```
+
+**Note that this analysis is done only to genes that passed the p-adjusted criteria. Think of doing this to all the genes in the dataset**
+
+## Generate a Ranked Gene List
+The ranked gene-list for the analysis needs to be ordered in a descending order by Fold-change. In the past, I tried ordering by *p*-values and by $-log10(p-value)*log_{2}(Fold-Change)$, but these didn't give meaningful results. I'll analyze the gene-lists from each strain independently. 
+**Split this into 3 analyses**.
+
+Return a vector of the Gene IDs for all the identified genes.
+```{r ranked-n2}
+strain <- "N2"
+
+ranked <- ge %>% 
+  dplyr::filter((!!strain) == strain) %>%
+  dplyr::arrange(desc(`log2FoldChange Treated vs untreated`))
+
+ranked <- setNames(ranked$`log2FoldChange Treated vs untreated`,ranked$`Gene ID`)
+
+ranked_n2 <- ranked
+```
+
+```{r ranked-am140}
+strain <- "AM140"
+
+ranked <- ge %>% 
+  dplyr::filter((!!strain) == strain) %>%
+  dplyr::arrange(desc(`log2FoldChange Treated vs untreated`))
+
+ranked <- setNames(ranked$`log2FoldChange Treated vs untreated`,ranked$`Gene ID`)
+
+ranked_am <- ranked
+```
+
+```{r ranked-cl2006}
+strain <- "CL2006"
+
+ranked <- ge %>% 
+  dplyr::filter((!!strain) == strain) %>%
+  dplyr::arrange(desc(`log2FoldChange Treated vs untreated`))
+
+ranked <- setNames(ranked$`log2FoldChange Treated vs untreated`,ranked$`Gene ID`)
+
+ranked_cl <- ranked
+```
+
+## Fetch Attributes from BioMaRt
+
+```{r biomart-object}
+mart = useMart(biomart="ensembl", dataset="celegans_gene_ensembl")
+```
+
+Fetch Gene-Ontology (GO) and GO-Slim annotations for *C. elegans*.
+```{r go-annotations}
+# GO attributes of interest
+att <- c("ensembl_gene_id",
+         "go_id",
+         "name_1006",
+         "definition_1006",
+         "go_linkage_type",
+         "namespace_1003")
+go_ann <- getBM(attributes = att, 
+                filters=list(biotype='protein_coding'),
+                mart=mart)
+
+# Same for GO-slim attributes
+att <- c("ensembl_gene_id",
+         "goslim_goa_accession",
+         "name_1006",
+         "goslim_goa_description",
+         "go_linkage_type",
+         "namespace_1003")
+gosl_ann <- getBM(attributes = att, 
+                  filters=list(biotype='protein_coding'),
+                  mart=mart)
+```
+
+The process takes a while, so save the data for faster future run-times.
+```{r save-annotations}
+save(go_ann,gosl_ann, file = "data/2019-01-24-GO-annotations.Rdata")
+```
+
+## Process GO Terms
+
+```{r load-annotations}
+load("data/2019-01-24-GO-annotations.Rdata",verbose = TRUE)
+```
+
+View possible GO terms categories
+```{r go-categories}
+levels(factor(go_ann$namespace_1003))
+```
+Looked further into "" and "eco", very few terms. Can ignore.
+```{r unknown-categories}
+go_ann[go_ann$namespace_1003 == "" & go_ann$go_id != "",]
+go_ann[go_ann$namespace_1003 == "eco",]
+```
+
+## Parse GO terms for input to GSEA
+
+The goal here is to separate the GO terms of the three GO categories ...
+- biological_process
+- molecular_function
+- cellular_component
+
+... and generate lists, in which each vector of gene IDs is named by the GO term and its accession number.
+
+The "IEA"-labelled GO terms correspond to annotations that were automatically determined, with no experimental support. Therefore, it is excluded.
+```{r iea-exclude}
+go_ann <- filter(go_ann,go_linkage_type != "IEA")
+```
+
+Extract GO annotations that are under *Biological Process*.
+```{r parse-bp}
+bp <- go_ann %>% filter(namespace_1003 == "biological_process")
+
+bp <- split(bp$ensembl_gene_id,paste(bp$go_id,bp$name_1006))
+bp <- lapply(bp, unique) # Removing gene IDs that are repeated under a term.
+```
+
+Extract GO annotations that are under *Molecular Function*.
+```{r parse-mf}
+mf <- go_ann %>% filter(namespace_1003 == "molecular_function")
+
+mf <- split(mf$ensembl_gene_id,paste(mf$go_id,mf$name_1006))
+mf <- lapply(mf, unique) # Removing gene IDs that are repeated under a term.
+```
+
+Extract GO annotations that are under *Cellular Component*.
+```{r parse-cc}
+cc <- go_ann %>% filter(namespace_1003 == "cellular_component")
+
+cc <- split(cc$ensembl_gene_id,paste(cc$go_id,cc$name_1006))
+cc <- lapply(cc, unique) # Removing gene IDs that are repeated under a term.
+```
+
+## Perform GO-GSEA
+Using the package **fgsea** to perform GSEA, focusing on medium-sized gene-sets (with 15-500 members), 10,000 permutations.
+```{r gsea-parameters}
+minSize <- 15
+maxSize <- 500
+nperm <- 10000
+```
+
+```{r results-summary}
+res <- data.frame()
+```
+
+### BP
+```{r BP-N2}
+strain <- "N2"
+pathways_name <- "Biological Process"
+ranked <- ranked_n2
+pathways <- bp
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+```{r BP-AM140}
+strain <- "AM140"
+pathways_name <- "Biological Process"
+ranked <- ranked_am
+pathways <- bp
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+```{r BP-CL2006}
+strain <- "CL2006"
+pathways_name <- "Biological Process"
+ranked <- ranked_cl
+pathways <- bp
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+### MF
+```{r MF-N2}
+strain <- "N2"
+pathways_name <- "Molecular Function"
+ranked <- ranked_n2
+pathways <- mf
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+```{r MF-AM140}
+strain <- "AM140"
+pathways_name <- "Molecular Function"
+ranked <- ranked_am
+pathways <- mf
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+```{r MF-CL2006}
+strain <- "CL2006"
+pathways_name <- "Molecular Function"
+ranked <- ranked_cl
+pathways <- mf
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+### CC
+```{r CC-N2}
+strain <- "N2"
+pathways_name <- "Cellular Component"
+ranked <- ranked_n2
+pathways <- cc
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+```{r CC-AM140}
+strain <- "AM140"
+pathways_name <- "Cellular Component"
+ranked <- ranked_am
+pathways <- cc
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+```{r CC-CL2006}
+strain <- "CL2006"
+pathways_name <- "Cellular Component"
+ranked <- ranked_cl
+pathways <- cc
+
+set.seed(159159)
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranked,
+                  minSize = minSize,
+                  maxSize = maxSize,
+                  nperm = nperm)
+
+# Print top 5 enriched pathways
+print(head(fgseaRes[order(pval),][padj < 0.05],5))
+
+res <- fgseaRes[order(pval),][padj < 0.05] %>%
+  mutate(strain = strain, GO_category = pathways_name) %>%
+  bind_rows(res)
+```
+
+## Export GSEA Results
+
+Save the results of the GSEA
+```{r save-gsea}
+save(res, 
+     file = paste0("results/",today,"-gsea",".Rdata"))
+
+# Convert the column of gene names that are associated to each GO term from 
+# a list of strings, to a string.
+res$leadingEdge <- sapply(res$leadingEdge,
+                          FUN = function(x) paste(x, collapse = ' '))
+
+# Reorder the columns
+res <- res %>% dplyr::select(strain,GO_category,everything())
+write_csv(x = res,path = paste0("results/",today,"-gsea",".csv"))
+```
+
+# Gene lists tables
+
+Focus on differentially expressed genes and renname columns
+```{r}
+tab <- ge %>% 
+  filter(`Gene ID` %in% goi) %>% 
+  rename(Gene_Name = `gene name`,
+         Gene_ID = `Gene ID`,
+         log2FC = `log2FoldChange Treated vs untreated`,
+         FDR_adj_pvalue = `padj Treated vs untreated`) %>%
+  select(-baseMean)
+```
+
+Combined table for all three strains, up- and down-regulated genes.
+```{r}
+tab %>% 
+  gather(score,quant,log2FC,FDR_adj_pvalue) %>%
+  unite(score,strain,score,sep = "_") %>%
+  spread(score,quant) %>%
+  select(Gene_ID,Gene_Name,N2_log2FC,N2_FDR_adj_pvalue,AM140_log2FC,AM140_FDR_adj_pvalue,
+         CL2006_log2FC,CL2006_FDR_adj_pvalue) %>% # Reorder columns
+  write_excel_csv(path = "results/gene_lists/genes_list.csv")
+```
+
+Table for each strain, up- or down-regulated, individualy.
+```{r}
+# N2 upregulated
+tab %>% filter(strain == 'N2',
+               FDR_adj_pvalue < 0.1,
+               log2FC > 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/N2_upreg.csv")
+
+# N2 downregulated
+tab %>% filter(strain == 'N2',
+               FDR_adj_pvalue < 0.1,
+               log2FC < 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/N2_dnreg.csv")
+
+# AM140 upregulated
+tab %>% filter(strain == 'AM140',
+               FDR_adj_pvalue < 0.1,
+               log2FC > 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/AM140_upreg.csv")
+
+# AM140 downregulated
+tab %>% filter(strain == 'AM140',
+               FDR_adj_pvalue < 0.1,
+               log2FC < 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/AM140_dnreg.csv")
+  
+# CL2006 upregulated
+tab %>% filter(strain == 'CL2006',
+               FDR_adj_pvalue < 0.1,
+               log2FC > 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/CL2006_upreg.csv")
+
+# CL2006  downregulated
+tab %>% filter(strain == 'CL2006',
+               FDR_adj_pvalue < 0.1,
+               log2FC < 0) %>%
+  arrange(FDR_adj_pvalue) %>%
+  write_excel_csv(path = "results/gene_lists/CL2006_dnreg.csv")
+```
+
+
+```{r session-info}
+sessionInfo()
+```
 
