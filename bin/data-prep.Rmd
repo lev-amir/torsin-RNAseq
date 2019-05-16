@@ -74,7 +74,7 @@ rm(list = c("AM","CL","N2"))
 ## Generate Gene Lists (Up-/Down-regulated)
 Used in Venn diagram and Heatmap
 
-Load the clean dataframes (**load checkpoint**).
+### Load Dataframes (**checkpoint**).
 ```{r load-data}
 # load("data/import-clean-ge.Rdata")
 ```
@@ -195,6 +195,8 @@ rm(list = c("filename","title"))
 
 ## Heatmap: differentially expressed genes
 
+### Data-prep 
+
 Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r pool-regulated}
 load("../data/up.Rdata")
@@ -202,9 +204,7 @@ load("../data/dn.Rdata")
 goi <- union(all.up,all.dn)
 ```
 
-Create a fold-change values matrix of genes of interest.
-Import normalized counts of differentially expressed genes.
-Covert the counts to a numerical matrix, and names the genes.
+Create a fold-change values matrix of genes of interest. Import normalized counts of differentially expressed genes. Convert the counts to a numerical matrix, and names the genes.
 ```{r import-reads, results='hide'}
 norm <- read_csv("../raw/2018-10-15-Results_files/normalized_counts.csv") %>% 
   rename("gene_id" = X1) %>% filter(gene_id %in% goi)
@@ -216,18 +216,25 @@ norm_mat <- as.matrix(norm[,5:27])
 rownames(norm_mat) <- norm$gene_id
 ```
 
-Transform values to Z-score by gene (row)
+Transform values to Z-score by gene (row), save the data matrix.
 ```{r, results='hide'}
 z_mat <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat, MARGIN = 1,FUN = sd) # Z-score by row
 
 save(goi,norm_mat,z_mat,file = "../data/heatmap.Rdata")
 ```
 
-Clustering
+### Load Dataframes (**checkpoint**).
+```{r load-data}
+# load("../data/heatmap.Rdata")
+```
+
+Hierarchical Clustering by row and column.
 ```{r h-clustering}
 rc <- z_mat %>% dist %>% hclust %>% as.dendrogram
 cc <- z_mat %>% t %>% dist %>% hclust %>% as.dendrogram
 ```
+
+### Plot
 
 Set colors for Heatmap, 256 colors in the scale.
 ```{r color-scale}
@@ -235,9 +242,8 @@ col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(256)) # Reverse so Blue is d
 col.lab <- brewer.pal(6, "Paired")
 ```
 
-Plot heatmap
-https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/r/heatmap/
-https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/
+Plot heatmap.
+Based on [1](https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/r/heatmap/) and [2](https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/).
 ```{r plot-heatmap}
 # dev.off()
 svg(file = paste0(results_dir,today,"-heatmap.svg",
