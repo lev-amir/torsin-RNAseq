@@ -6,6 +6,8 @@ date: "2018-10-29"
 output: md_document
 ---
 
+**2019-05-16 Changed dataframes to only protein coding genes, re-running the code to generate new plots. Stopped before heatmap.**
+
 # Pre-code
 
 ## Set parameters
@@ -13,7 +15,6 @@ output: md_document
 today = Sys.Date()
 results_dir = "../results/"
 data_dir = "../data/"
-raw_data_dir = "../raw"
 ```
 
 ## Import Packages
@@ -36,17 +37,17 @@ lapply(packages, require, character.only = TRUE) # Load packages
 Import the gene expression data sent by the Technion. Specifiy how to treat NA values. Specify the columns' data-types, since the default loads all as characters. 
 ```{r import-data}
 AM <- readxl::read_excel(
-  path = "../raw/2018-10-25-Results_files/Final_results_AM140_treated_vs_untreated_.xlsx", 
+  path = "raw/2018-10-25-Results_files/Final_results_AM140_treated_vs_untreated_.xlsx", 
   col_names = TRUE, 
   col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
   na = 'NA')
 CL <- readxl::read_excel(
-  path = "../raw/2018-10-25-Results_files/Final_results_CL2006_treated_vs_untreated_.xlsx",
+  path = "raw/2018-10-25-Results_files/Final_results_CL2006_treated_vs_untreated_.xlsx",
   col_names = TRUE, 
   col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
   na = 'NA')
 N2 <- readxl::read_excel(
-  path = "../raw/2018-10-25-Results_files/Final_results_N2_treated_vs_untreated.xlsx",
+  path = "raw/2018-10-25-Results_files/Final_results_N2_treated_vs_untreated.xlsx",
   col_names = TRUE, 
   col_types = c(rep("text",4),rep("numeric",5),rep("text",4)), 
   na = 'NA')
@@ -57,22 +58,42 @@ N2 <- readxl::read_excel(
 Merge the three strain specific dataframes to one gene expression (ge) dataframe. Remove unnecessary columns for further analysis. Focus on genes that underwent the multiple comparisons test (*Tested*). Sort the dataframe by the adjusted p-value.
 ```{r process-data}
 ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
-  dplyr::filter(`flag Treated vs untreated` == "Tested") %>%
+  dplyr::filter(`flag Treated vs untreated` == "Tested") %>% # High counts only.
+  dplyr::filter(`gene biotype` == "protein_coding") %>% # Ignore mapping to non-protein coding genes
   dplyr::select(strain,
                 `Gene ID`,
                 `gene name`,
                 baseMean,
                 `log2FoldChange Treated vs untreated`,
+                `pvalue Treated vs untreated`,
                 `padj Treated vs untreated`) %>%
   arrange(`padj Treated vs untreated`) %>%
   group_by(strain)
 ```
 
+## Merge strains (all protein coding genes)
+Merge the three strain specific dataframes to one gene expression (ge) dataframe. Remove unnecessary columns for further analysis. Focus on protein coding genes, regardless of whether they underwent a statistical text. Sort the dataframe by fold-change.
+```{r process-data}
+gepc <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
+  dplyr::filter(`flag Treated vs untreated` != "All_Zero") %>% # All positive reads
+  dplyr::filter(`gene biotype` == "protein_coding") %>% # Ignore mapping to non-protein coding genes
+  dplyr::select(strain,
+                `Gene ID`,
+                `gene name`,
+                baseMean,
+                `log2FoldChange Treated vs untreated`,
+                `pvalue Treated vs untreated`,
+                `padj Treated vs untreated`) %>%
+  arrange(`log2FoldChange Treated vs untreated`) %>%
+  group_by(strain)
+```
+
+
 ## Save clean data
 Save cleaned dataframes and remove individual strains data-frames (save checkpoint).
 ```{r save-data}
-save(AM,CL,N2,ge,
-     file = "../data/import-clean-ge.Rdata")
+save(AM,CL,N2,ge,gepc,
+     file = "data/import-clean-ge.Rdata")
 rm(list = c("AM","CL","N2"))
 ```
 
@@ -106,7 +127,7 @@ N2 <- ge %>%
 
 all.up <- unique(c(AM,CL,N2))
 
-save(AM,CL,N2,all.up,file = "../data/up.Rdata")
+save(AM,CL,N2,all.up,file = "data/up.Rdata")
 ```
 
 Obtain gene lists of downregulated genes (*p*-value < 0.1), for each strain.
@@ -124,7 +145,7 @@ CL <- ge %>%
          `log2FoldChange Treated vs untreated` < 0) %>%
   pull(`Gene ID`)
 
-N2<- ge %>% 
+N2 <- ge %>% 
   filter(strain == "N2",
          `padj Treated vs untreated` < 0.1,
          `log2FoldChange Treated vs untreated` < 0) %>%
@@ -132,17 +153,17 @@ N2<- ge %>%
 
 all.dn <- unique(c(AM,CL,N2))
 
-save(AM,CL,N2,all.dn,file = "../data/dn.Rdata")
+save(AM,CL,N2,all.dn,file = "data/dn.Rdata")
 ```
 
 # Venn Diagram: differentially expressed genes
 
 Visualize up-regulated genes in the three strains as a Venn diagram.
 ```{r venn-upregulated}
-load("../data/up.Rdata")
+load("data/up.Rdata")
 
-dir.create("../results", showWarnings = FALSE)
-filename = "../results/2018-11-04-venn_anc1_upregulated.tiff"
+dir.create("results", showWarnings = FALSE)
+filename = "results/2019-05-16-venn_tor_rnai_upregulated.tiff"
 title = "Upregulated (p < 0.1)"
 
 venn.diagram(
@@ -166,10 +187,10 @@ venn.diagram(
 
 Visualize down-regulated genes in the three strains.
 ```{r venn-downregulated}
-load("../data/dn.Rdata")
+load("data/dn.Rdata")
 
-dir.create("../results", showWarnings = FALSE)
-filename = "../results/2018-11-04-venn_anc1_downregulated.tiff"
+dir.create("results", showWarnings = FALSE)
+filename = "results/2019-05-16-venn_tor_rnai_downregulated.tiff"
 title = "Downregulated (p < 0.1)"
 
 venn.diagram(
@@ -195,6 +216,8 @@ Remove variables used for Venn diagram.
 ```{r clean-venn}
 rm(list = c("filename","title"))
 ```
+
+**STOPPED HERE**
 
 # Heatmap: differentially expressed genes
 
@@ -318,7 +341,7 @@ tab %>%
   write_excel_csv(path = "results/gene_lists/genes_list.csv")
 ```
 
-Table for each strain, up- or down-regulated, individualy.
+Table for each strain, up- or down-regulated, individualy. Save as CSV files. 
 ```{r generate-de-tables}
 # N2 upregulated
 tab %>% filter(strain == 'N2',
@@ -363,15 +386,7 @@ tab %>% filter(strain == 'CL2006',
   write_excel_csv(path = "results/gene_lists/CL2006_dnreg.csv")
 ```
 
-
-# Gene Annotations
-
-**Note that the current `ge` filters only the genes that were tested.**
-
 ## Fetch attributes from BioMaRt
-
-
-
 ## Gene Set Enrichment Analysis (GSEA)
 
 ```{r}
@@ -379,17 +394,15 @@ write(ge %>% filter(`padj Treated vs untreated` < 0.1) %>% pull(`Gene ID`) %>% u
       file = "a.txt")
 ```
 
+# GO GSEA (p<0.1)
+Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
 
-# Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
-
-## Load datasets
-
-Load the clean dataframes (load checkpoint).
+## Load Dataframe (**checkpoint**).
 ```{r load-data-gsea}
 load("data/import-clean-ge.Rdata", verbose = TRUE)
 ```
 
-**Note that this analysis is done only to genes that passed the p-adjusted criteria. Think of doing this to all the genes in the dataset**
+**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all the genes in the dataset.
 
 ## Generate a Ranked Gene List
 The ranked gene-list for the analysis needs to be ordered in a descending order by Fold-change. In the past, I tried ordering by *p*-values and by $-log10(p-value)*log_{2}(Fold-Change)$, but these didn't give meaningful results. I'll analyze the gene-lists from each strain independently. 
