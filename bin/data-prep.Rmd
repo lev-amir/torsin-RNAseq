@@ -198,6 +198,8 @@ rm(list = c("filename","title"))
 
 # Heatmap: differentially expressed genes
 
+## Data-prep 
+
 Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r pool-regulated}
 load("../data/up.Rdata")
@@ -292,22 +294,10 @@ heatmap.2(x = z_mat, # data
 dev.off()
 ```
 
-# Gene Annotations
-
-**Note that the current `ge` filters only the genes that were tested.**
-
-## Fetch attributes from BioMaRt
-
-
-
-## Gene Set Enrichment Analysis (GSEA)
-
-
-
-## Gene lists tables
+# Gene Tables
 
 Focus on differentially expressed genes and renname columns
-```{r}
+```{r de-rename}
 tab <- ge %>% 
   filter(`Gene ID` %in% goi) %>% 
   rename(Gene_Name = `gene name`,
@@ -317,9 +307,8 @@ tab <- ge %>%
   select(-baseMean)
 ```
 
-
 Combined table for all three strains, up- and down-regulated genes.
-```{r}
+```{r combine-strains}
 tab %>% 
   gather(score,quant,log2FC,FDR_adj_pvalue) %>%
   unite(score,strain,score,sep = "_") %>%
@@ -330,7 +319,7 @@ tab %>%
 ```
 
 Table for each strain, up- or down-regulated, individualy.
-```{r}
+```{r generate-de-tables}
 # N2 upregulated
 tab %>% filter(strain == 'N2',
                FDR_adj_pvalue < 0.1,
@@ -375,6 +364,15 @@ tab %>% filter(strain == 'CL2006',
 ```
 
 
+# Gene Annotations
+
+**Note that the current `ge` filters only the genes that were tested.**
+
+## Fetch attributes from BioMaRt
+
+
+
+## Gene Set Enrichment Analysis (GSEA)
 
 ```{r}
 write(ge %>% filter(`padj Treated vs untreated` < 0.1) %>% pull(`Gene ID`) %>% unique(),
