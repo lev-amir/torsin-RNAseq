@@ -18,7 +18,8 @@ raw_data_dir = "../raw"
 
 ## Import Packages
 ```{r packages, results='hide'}
-packages <- c("BiocManager","tidyverse","biomaRt","org.Ce.eg.db","fgsea")
+packages <- c("BiocManager","tidyverse","biomaRt","org.Ce.eg.db","fgsea",
+              "VennDiagram","viridis","gplots","RColorBrewer")
 install.packages(packages) # Install packages
 lapply(packages, require, character.only = TRUE) # Load packages
 ```
@@ -63,7 +64,6 @@ ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
 ```
 
 ## Save clean data
-
 Save cleaned dataframes and remove individual strains data-frames (save checkpoint).
 ```{r save-data}
 save(AM,CL,N2,ge,
@@ -71,19 +71,15 @@ save(AM,CL,N2,ge,
 rm(list = c("AM","CL","N2"))
 ```
 
-**STOPPED HERE**
-
-## Generate Gene Lists
+## Generate Gene Lists (Up-/Down-regulated)
 Used in Venn diagram and Heatmap
 
-Load the clean dataframes (load checkpoint).
+Load the clean dataframes (**load checkpoint**).
 ```{r load-data}
 # load("data/import-clean-ge.Rdata")
 ```
 
-Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain.
-Create a gene-name vector to generate a heatmap.
-Save data.
+Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain. Create a gene-name vector to generate a heatmap and save the data-frame.
 ```{r get-upregulated}
 AM <- ge %>% 
   filter(strain == "AM140",
@@ -134,18 +130,9 @@ all.dn <- unique(c(AM,CL,N2))
 save(AM,CL,N2,all.dn,file = "../data/dn.Rdata")
 ```
 
-## Venn Diagram
+# Visuals
 
-Load packages
-```{r packages, results='hide'}
-# Standalone
-if (!require(VennDiagram)) {install.packages("VennDiagram"); library(VennDiagram)}
-if (!require(viridis)) {install.packages("viridis"); library(viridis)}
-
-# Conda
-library(VennDiagram)
-library(viridis)
-```
+## Venn Diagram: differentially expressed genes
 
 Visualize up-regulated genes in the three strains as a Venn diagram.
 ```{r venn-upregulated}
@@ -206,16 +193,7 @@ Remove variables used for Venn diagram.
 rm(list = c("filename","title"))
 ```
 
-## Heatmap of differentially expressed genes
-
-Load pacakges
-```{r packages, results='hide'}
-# Standalone
-if (!require(gplots)) {install.packages("gplots"); library(gplots)}
-if (!require(RColorBrewer)) {install.packages("RColorBrewer"); library(RColorBrewer)}
-# Conda
-library(RColorBrewer)
-```
+## Heatmap: differentially expressed genes
 
 Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r pool-regulated}
