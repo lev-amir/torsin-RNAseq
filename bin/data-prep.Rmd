@@ -27,11 +27,6 @@ packages <- c(
 )
 install.packages(packages) # Install packages
 lapply(packages, require, character.only = TRUE) # Load packages
-
-if (!require(biomaRt)) {BiocManager::install(); library(biomaRt)}
-if (!require(org.Ce.eg.db)) {BiocManager::install(); library(org.Ce.eg.db)}
-
-
 ```
 
 # Data Cleaning
@@ -140,9 +135,7 @@ all.dn <- unique(c(AM,CL,N2))
 save(AM,CL,N2,all.dn,file = "../data/dn.Rdata")
 ```
 
-# Visuals
-
-## Venn Diagram: differentially expressed genes
+# Venn Diagram: differentially expressed genes
 
 Visualize up-regulated genes in the three strains as a Venn diagram.
 ```{r venn-upregulated}
@@ -203,9 +196,7 @@ Remove variables used for Venn diagram.
 rm(list = c("filename","title"))
 ```
 
-## Heatmap: differentially expressed genes
-
-### Data-prep 
+# Heatmap: differentially expressed genes
 
 Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r pool-regulated}
@@ -233,7 +224,7 @@ z_mat <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat, MARGIN = 1,FUN = sd) 
 save(goi,norm_mat,z_mat,file = "../data/heatmap.Rdata")
 ```
 
-### Load Dataframes (**checkpoint**).
+## Load Dataframes (**checkpoint**).
 ```{r load-data}
 # load("../data/heatmap.Rdata")
 ```
@@ -244,7 +235,7 @@ rc <- z_mat %>% dist %>% hclust %>% as.dendrogram
 cc <- z_mat %>% t %>% dist %>% hclust %>% as.dendrogram
 ```
 
-### Plot
+## Plot
 
 Set colors for Heatmap, 256 colors in the scale.
 ```{r color-scale}
@@ -301,7 +292,7 @@ heatmap.2(x = z_mat, # data
 dev.off()
 ```
 
-# Analyze Gene Annotations
+# Gene Annotations
 
 **Note that the current `ge` filters only the genes that were tested.**
 
