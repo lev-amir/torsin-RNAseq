@@ -18,10 +18,20 @@ raw_data_dir = "../raw"
 
 ## Import Packages
 ```{r packages, results='hide'}
-packages <- c("BiocManager","tidyverse","biomaRt","org.Ce.eg.db","fgsea",
-              "VennDiagram","viridis","gplots","RColorBrewer")
+packages <- c(
+  "BiocManager","tidyverse",
+  "VennDiagram","viridis", # Venn Diagram
+  "gplots","RColorBrewer", # Heatmap plot
+  "biomaRt","org.Ce.eg.db", # Gene Annotations
+  "fgsea" # GSEA
+)
 install.packages(packages) # Install packages
 lapply(packages, require, character.only = TRUE) # Load packages
+
+if (!require(biomaRt)) {BiocManager::install(); library(biomaRt)}
+if (!require(org.Ce.eg.db)) {BiocManager::install(); library(org.Ce.eg.db)}
+
+
 ```
 
 # Data Cleaning
@@ -291,22 +301,15 @@ heatmap.2(x = z_mat, # data
 dev.off()
 ```
 
-# Analyze gene annotations
+# Analyze Gene Annotations
 
 **Note that the current `ge` filters only the genes that were tested.**
 
 ## Fetch attributes from BioMaRt
-```{r packages}
-if (!require(biomaRt)) {BiocManager::install("biomaRt"); library(biomaRt)}
-if (!require(org.Ce.eg.db)) {BiocManager::install("org.Ce.eg.db"); library(org.Ce.eg.db)}
-```
+
 
 
 ## Gene Set Enrichment Analysis (GSEA)
-Load packages
-```{r packages, results='hide'}
-
-```
 
 
 
