@@ -357,6 +357,27 @@ dev.off()
 # load("data/import-clean-ge.Rdata")
 ```
 
+```{r per-strain-foldchange}
+fc <- 
+  gepc_tested %>% 
+  dplyr::select(-baseMean,-pvalue,-flag,-FDR_adj_pvalue) %>%
+  spread(key = strain,
+         value = c(log2FC)) %>%
+  dplyr::mutate(diff = abs(AM140-CL2006)) %>% # difference between CL2006 and AM140 FC
+  dplyr::arrange(desc(diff))
+```
+
+**Heatmap by FC, can also try by Z-score**
+
+```{r fc-matrix}
+mat <- cbind(fc$N2,fc$AM140,fc$CL2006)
+rownames(mat) <- fc$Gene_Name
+colnames(mat) <- c('N2','AM140','CL2006')
+
+
+```
+
+
 
 
 # Gene Tables
@@ -367,10 +388,6 @@ dev.off()
 # load("data/heatmap.Rdata")
 ```
 
-```{r}
-gepc_tested %>% 
-  dplyr::filter()
-```
 
 
 Focus on differentially expressed genes and renname columns
