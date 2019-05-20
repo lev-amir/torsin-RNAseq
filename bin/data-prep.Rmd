@@ -6,7 +6,7 @@ date: "2018-10-29"
 output: md_document
 ---
 
-**2019-05-16 Changed dataframes to only protein coding genes, re-running the code to generate new plots. Stopped before heatmap.**
+**2019-05-20 Stopped before Gene tables.**
 
 # Pre-code
 
@@ -24,7 +24,8 @@ packages <- c(
   "VennDiagram","viridis", # Venn Diagram
   "gplots","RColorBrewer", # Heatmap plot
   "biomaRt","org.Ce.eg.db", # Gene Annotations
-  "fgsea" # GSEA
+  "fgsea", # GSEA
+  "Cairo" # Export PDF/SVG
 )
 install.packages(packages) # Install packages
 lapply(packages, require, character.only = TRUE) # Load packages
@@ -66,7 +67,7 @@ gepc_read <-
                 Gene_ID = `Gene ID`,
                 log2FC = `log2FoldChange Treated vs untreated`,
                 pvalue = `pvalue Treated vs untreated`,
-                FDR_adj_pvalue = FDR_adj_pvalue,
+                FDR_p = `padj Treated vs untreated`,
                 flag = `flag Treated vs untreated`) %>%
   dplyr::select(strain,
                 Gene_ID,
@@ -74,7 +75,7 @@ gepc_read <-
                 baseMean,
                 log2FC,
                 pvalue,
-                FDR_adj_pvalue,
+                FDR_p,
                 flag) %>%
   arrange(log2FC) %>%
   group_by(strain)
@@ -86,7 +87,7 @@ Focus on genes that underwent the multiple comparisons test (*Tested*). Sort the
 ```{r process-data}
 gepc_tested <- gepc_read %>%
   dplyr::filter(flag == "Tested") %>% # High counts only.
-  arrange(FDR_adj_pvalue)
+  arrange(FDR_p)
 ```
 
 
@@ -110,19 +111,19 @@ Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain. Creat
 ```{r get-upregulated}
 AM <- gepc_tested %>% 
   filter(strain == "AM140",
-         FDR_adj_pvalue < 0.1,
+         FDR_p < 0.1,
          log2FC > 0) %>%
   pull(`Gene ID`)
 
 CL <- gepc_tested %>% 
   filter(strain == "CL2006",
-         FDR_adj_pvalue < 0.1,
+         FDR_p < 0.1,
          log2FC > 0) %>%
   pull(`Gene ID`)
 
 N2 <- gepc_tested %>% 
   filter(strain == "N2",
-         FDR_adj_pvalue < 0.1,
+         FDR_p < 0.1,
          log2FC > 0) %>%
   pull(`Gene ID`)
 
@@ -136,19 +137,19 @@ Combine all genes for heatmap.
 ```{r get-downregulated}
 AM <- gepc_tested %>% 
   filter(strain == "AM140",
-         FDR_adj_pvalue < 0.1,
+         FDR_p < 0.1,
          log2FC < 0) %>%
   pull(`Gene ID`)
 
 CL <- gepc_tested %>% 
   filter(strain == "CL2006",
-         FDR_adj_pvalue < 0.1,
+         FDR_p < 0.1,
          log2FC < 0) %>%
   pull(`Gene ID`)
 
 N2 <- gepc_tested %>% 
   filter(strain == "N2",
-         FDR_adj_pvalue < 0.1,
+         FDR_p < 0.1,
          log2FC < 0) %>%
   pull(`Gene ID`)
 
@@ -349,7 +350,7 @@ legend(x=.25, y=1.3, # Legend poisition
 dev.off()
 ```
 
-# Heatmap: Oppositely regulated genes
+# Bar graph: Oppositely regulated genes
 
 ## Load Dataframes (**checkpoint**).
 ```{r load-data}
@@ -357,28 +358,69 @@ dev.off()
 # load("data/import-clean-ge.Rdata")
 ```
 
+## Data-prep
 ```{r per-strain-foldchange}
 fc <- 
   gepc_tested %>% 
-  dplyr::select(-baseMean,-pvalue,-flag,-FDR_adj_pvalue) %>%
-  spread(key = strain,
-         value = c(log2FC)) %>%
-  dplyr::mutate(diff = abs(AM140-CL2006)) %>% # difference between CL2006 and AM140 FC
+  # Remove irrelevant columns and keep p-adjusted and FC per gene.
+  dplyr::select(-baseMean,-pvalue,-flag) %>%
+  gather(variable,value, -(strain:Gene_Name)) %>%
+  unite(temp, strain, variable) %>%
+  spread(temp, value) %>%
+  
+  # difference between CL2006 and AM140 FC, value and direction
+  dplyr::mutate(diff = abs(AM140_log2FC-CL2006_log2FC),
+                sign = sign(AM140_log2FC-CL2006_log2FC)) %>% 
+  
+  # remove 
+  dplyr::filter(AM140_FDR_p < .1 | CL2006_FDR_p < .1 | N2_FDR_p < .05) %>%
+  
+  # order by difference between CL2006 and AM140 FC
   dplyr::arrange(desc(diff))
+
+fc$sign[fc$sign == 1] <- sprintf('\↑AM140 ↓CL2006')
+fc$sign[fc$sign == -1] <- sprintf('↓AM140 ↑CL2006')
 ```
 
-**Heatmap by FC, can also try by Z-score**
+## Plot
+```{r plot}
+# dev.off()
+svg(filename = "results/2019-05-20-response-AM140-CL2006.svg",
+          width = 3, 
+          height = 4,
+          pointsize = 3)
 
-```{r fc-matrix}
-mat <- cbind(fc$N2,fc$AM140,fc$CL2006)
-rownames(mat) <- fc$Gene_Name
-colnames(mat) <- c('N2','AM140','CL2006')
 
+fc[1:50,] %>% # Selected top 50 genes
+  ggplot( 
+  aes(x = reorder(Gene_Name, -diff), # Order by difference size
+      y = diff,
+      fill = sign)) + # Color by direction
+  geom_col() + 
+  #ylab(
+  #  expression('|'~(log[2]~FC~AM140)-(log[2]~FC~CL2006)~'|')
+  #  ) + 
+  ylab('Response Difference') + # See above note for how calculated
+  xlab('') + 
+  labs(fill = "Torsin RNAi effect") + # Legend title
+  coord_flip() + # 90 degrees flip
+  theme_classic() + 
+  
+  # Removes the space between the x-axis labels and zero values
+  scale_y_continuous(expand = c(0,0)) + 
+  #theme(panel.grid = element_blank(), panel.border = element_blank()) + 
+  theme(legend.position = c(.8,.9),
+        text = element_text(size=7)) +  # font size of entire plot
+  guides(fill=guide_legend(keywidth=0.1, # Space between legend items
+                           keyheight=0.1,
+                           default.unit="inch")) + 
+  scale_fill_grey(start = 0.2, end = 0.8) # Colors used
 
+dev.off()
 ```
 
 
-
+**STOPPED HERE**
 
 # Gene Tables
 
@@ -398,7 +440,7 @@ tab <- ge %>%
   dplyr::rename(Gene_Name = `gene name`,
                 Gene_ID = `Gene ID`,
                 log2FC = `log2FoldChange Treated vs untreated`,
-                FDR_adj_pvalue = FDR_adj_pvalue) %>%
+                FDR_p = FDR_adj_pvalue) %>%
   dplyr::select(-baseMean)
 ```
 
