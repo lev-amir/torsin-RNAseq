@@ -53,46 +53,47 @@ N2 <- readxl::read_excel(
   na = 'NA')
 ```
 
-## Merge strains (tested genes only)
-
-Merge the three strain specific dataframes to one gene expression (ge) dataframe. Remove unnecessary columns for further analysis. Focus on genes that underwent the multiple comparisons test (*Tested*). Sort the dataframe by the adjusted p-value.
-```{r process-data}
-ge <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
-  dplyr::filter(`flag Treated vs untreated` == "Tested") %>% # High counts only.
-  dplyr::filter(`gene biotype` == "protein_coding") %>% # Ignore mapping to non-protein coding genes
-  dplyr::select(strain,
-                `Gene ID`,
-                `gene name`,
-                baseMean,
-                `log2FoldChange Treated vs untreated`,
-                `pvalue Treated vs untreated`,
-                `padj Treated vs untreated`) %>%
-  arrange(`padj Treated vs untreated`) %>%
-  group_by(strain)
-```
-
 ## Merge strains (all protein coding genes)
 Merge the three strain specific dataframes to one gene expression (ge) dataframe. Remove unnecessary columns for further analysis. Focus on protein coding genes, regardless of whether they underwent a statistical text. Sort the dataframe by fold-change.
 ```{r process-data}
-gepc <- bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
-  dplyr::filter(`flag Treated vs untreated` != "All_Zero") %>% # All positive reads
-  dplyr::filter(`gene biotype` == "protein_coding") %>% # Ignore mapping to non-protein coding genes
+gepc_read <- 
+  bind_rows(list(N2 = N2,AM140 = AM, CL2006 = CL), .id = 'strain') %>%
+  dplyr::filter(`flag Treated vs untreated` != "All_Zero") %>% 
+  # All positive reads
+  dplyr::filter(`gene biotype` == "protein_coding") %>% 
+  # Ignore mapping to non-protein coding genes
+  dplyr::rename(Gene_Name = `gene name`,
+                Gene_ID = `Gene ID`,
+                log2FC = `log2FoldChange Treated vs untreated`,
+                pvalue = `pvalue Treated vs untreated`,
+                FDR_adj_pvalue = FDR_adj_pvalue,
+                flag = `flag Treated vs untreated`) %>%
   dplyr::select(strain,
-                `Gene ID`,
-                `gene name`,
+                Gene_ID,
+                Gene_Name,
                 baseMean,
-                `log2FoldChange Treated vs untreated`,
-                `pvalue Treated vs untreated`,
-                `padj Treated vs untreated`) %>%
-  arrange(`log2FoldChange Treated vs untreated`) %>%
+                log2FC,
+                pvalue,
+                FDR_adj_pvalue,
+                flag) %>%
+  arrange(log2FC) %>%
   group_by(strain)
+```
+
+## Filter tested genes only
+
+Focus on genes that underwent the multiple comparisons test (*Tested*). Sort the dataframe by the adjusted p-value.
+```{r process-data}
+gepc_tested <- gepc_read %>%
+  dplyr::filter(flag == "Tested") %>% # High counts only.
+  arrange(FDR_adj_pvalue)
 ```
 
 
 ## Save clean data
 Save cleaned dataframes and remove individual strains data-frames (save checkpoint).
 ```{r save-data}
-save(AM,CL,N2,ge,gepc,
+save(AM,CL,N2,gepc_read,gepc_tested,
      file = "data/import-clean-ge.Rdata")
 rm(list = c("AM","CL","N2"))
 ```
@@ -107,22 +108,22 @@ Used in Venn diagram and Heatmap
 
 Obtain gene lists of upregulated genes (*p*-value < 0.1), for each strain. Create a gene-name vector to generate a heatmap and save the data-frame.
 ```{r get-upregulated}
-AM <- ge %>% 
+AM <- gepc_tested %>% 
   filter(strain == "AM140",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` > 0) %>%
+         FDR_adj_pvalue < 0.1,
+         log2FC > 0) %>%
   pull(`Gene ID`)
 
-CL <- ge %>% 
+CL <- gepc_tested %>% 
   filter(strain == "CL2006",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` > 0) %>%
+         FDR_adj_pvalue < 0.1,
+         log2FC > 0) %>%
   pull(`Gene ID`)
 
-N2 <- ge %>% 
+N2 <- gepc_tested %>% 
   filter(strain == "N2",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` > 0) %>%
+         FDR_adj_pvalue < 0.1,
+         log2FC > 0) %>%
   pull(`Gene ID`)
 
 all.up <- unique(c(AM,CL,N2))
@@ -133,22 +134,22 @@ save(AM,CL,N2,all.up,file = "data/up.Rdata")
 Obtain gene lists of downregulated genes (*p*-value < 0.1), for each strain.
 Combine all genes for heatmap.
 ```{r get-downregulated}
-AM <- ge %>% 
+AM <- gepc_tested %>% 
   filter(strain == "AM140",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` < 0) %>%
+         FDR_adj_pvalue < 0.1,
+         log2FC < 0) %>%
   pull(`Gene ID`)
 
-CL <- ge %>% 
+CL <- gepc_tested %>% 
   filter(strain == "CL2006",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` < 0) %>%
+         FDR_adj_pvalue < 0.1,
+         log2FC < 0) %>%
   pull(`Gene ID`)
 
-N2 <- ge %>% 
+N2 <- gepc_tested %>% 
   filter(strain == "N2",
-         `padj Treated vs untreated` < 0.1,
-         `log2FoldChange Treated vs untreated` < 0) %>%
+         FDR_adj_pvalue < 0.1,
+         log2FC < 0) %>%
   pull(`Gene ID`)
 
 all.dn <- unique(c(AM,CL,N2))
@@ -348,6 +349,16 @@ legend(x=.25, y=1.3, # Legend poisition
 dev.off()
 ```
 
+# Heatmap: Oppositely regulated genes
+
+## Load Dataframes (**checkpoint**).
+```{r load-data}
+# load("data/heatmap.Rdata")
+# load("data/import-clean-ge.Rdata")
+```
+
+
+
 # Gene Tables
 
 ## Load Dataframes (**checkpoint**).
@@ -356,14 +367,21 @@ dev.off()
 # load("data/heatmap.Rdata")
 ```
 
+```{r}
+gepc_tested %>% 
+  dplyr::filter()
+```
+
+
 Focus on differentially expressed genes and renname columns
 ```{r de-rename}
+# Change ge to gepc_tested or gepc_read
 tab <- ge %>% 
   filter(`Gene ID` %in% goi) %>% 
   dplyr::rename(Gene_Name = `gene name`,
                 Gene_ID = `Gene ID`,
                 log2FC = `log2FoldChange Treated vs untreated`,
-                FDR_adj_pvalue = `padj Treated vs untreated`) %>%
+                FDR_adj_pvalue = FDR_adj_pvalue) %>%
   dplyr::select(-baseMean)
 ```
 
@@ -427,7 +445,7 @@ tab %>% filter(strain == 'CL2006',
 ## Gene Set Enrichment Analysis (GSEA)
 
 ```{r}
-write(ge %>% filter(`padj Treated vs untreated` < 0.1) %>% pull(`Gene ID`) %>% unique(),
+write(ge %>% filter(FDR_adj_pvalue < 0.1) %>% pull(`Gene ID`) %>% unique(),
       file = "a.txt")
 ```
 
@@ -802,7 +820,7 @@ tab <- ge %>%
   rename(Gene_Name = `gene name`,
          Gene_ID = `Gene ID`,
          log2FC = `log2FoldChange Treated vs untreated`,
-         FDR_adj_pvalue = `padj Treated vs untreated`) %>%
+         FDR_adj_pvalue = FDR_adj_pvalue) %>%
   select(-baseMean)
 ```
 
