@@ -217,42 +217,46 @@ Remove variables used for Venn diagram.
 rm(list = c("filename","title"))
 ```
 
-**STOPPED HERE**
-
 # Heatmap: differentially expressed genes
 
 ## Data-prep 
 
 Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r pool-regulated}
-load("../data/up.Rdata")
-load("../data/dn.Rdata")
+load("data/up.Rdata")
+load("data/dn.Rdata")
 goi <- union(all.up,all.dn)
 ```
 
 Create a fold-change values matrix of genes of interest. Import normalized counts of differentially expressed genes. Convert the counts to a numerical matrix, and names the genes.
 ```{r import-reads, results='hide'}
-norm <- read_csv("../raw/2018-10-15-Results_files/normalized_counts.csv") %>% 
-  rename("gene_id" = X1) %>% filter(gene_id %in% goi)
+norm_df <- 
+  read_csv("raw/2018-10-15-Results_files/normalized_counts.csv") %>%
+  dplyr::rename(gene_id = X1) %>% 
+  filter(gene_id %in% goi)
 
 # Numerical Matrix of reads-only.
-norm_mat <- as.matrix(norm[,5:27])
+norm_mat <- as.matrix(norm_df[,5:27])
 
 # Name the genes
-rownames(norm_mat) <- norm$gene_id
+rownames(norm_mat) <- norm_df$gene_id
 ```
 
 Transform values to Z-score by gene (row), save the data matrix.
 ```{r, results='hide'}
-z_mat <- (norm_mat - rowMeans(norm_mat)) / apply(norm_mat, MARGIN = 1,FUN = sd) # Z-score by row
+z_mat <- 
+  (norm_mat - rowMeans(norm_mat)) / apply(norm_mat, MARGIN = 1,FUN = sd) 
+# Z-score by row
 
-save(goi,norm_mat,z_mat,file = "../data/heatmap.Rdata")
+save(goi,norm_mat,z_mat,file = "data/heatmap.Rdata")
 ```
 
 ## Load Dataframes (**checkpoint**).
 ```{r load-data}
-# load("../data/heatmap.Rdata")
+# load("data/heatmap.Rdata")
 ```
+
+## Clustering
 
 Hierarchical Clustering by row and column.
 ```{r h-clustering}
@@ -264,7 +268,9 @@ cc <- z_mat %>% t %>% dist %>% hclust %>% as.dendrogram
 
 Set colors for Heatmap, 256 colors in the scale.
 ```{r color-scale}
-col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(256)) # Reverse so Blue is downregulated.
+col <- rev(colorRampPalette(brewer.pal(10, "RdBu"))(16)) 
+# Reverse so Blue is downregulated.
+
 col.lab <- brewer.pal(6, "Paired")
 ```
 
@@ -272,10 +278,13 @@ Plot heatmap.
 Based on [1](https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/r/heatmap/) and [2](https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/).
 ```{r plot-heatmap}
 # dev.off()
-svg(file = paste0(results_dir,today,"-heatmap.svg",
-                  width = 8.5, 
-                  height = 11.5,
-                  pointsize = 7))
+svg(file = "results/2019-05-20-heatmap.svg",
+                  width = 4, 
+                  height = 3,
+                  pointsize = 9)
+
+# par$xpd=FALSE by default
+par(xpd=TRUE)
 
 heatmap.2(x = z_mat, # data
 
@@ -294,40 +303,68 @@ heatmap.2(x = z_mat, # data
           density.info = "none", # Remove the density curve in legend
           
           # Sizes
-          keysize = 1.05, # Color legend key size
-          key.par = list(cex = 0.7), # Color scale legend font
+          key = TRUE,
+          keysize = 1, # Color legend key size
+          key.par = list(cex = 0.5), # Color scale legend font
+          lhei = c(1,4), # ColorScale-to-Heatmap ratio, height
+          lwid=c(1,4), # ColorScale-to-Heatmap ratio, width
           
           # Labels
           labRow = "", # Label of rows
+          labCol = "", # Label of rows
           srtCol = 30, # Angle column labels.
-          key.title = "Gene Expression (Z-score)",
-          main = "Genes Regulated by Torsin RNAi",
+          key.title = NA, # Title of Color Scale
+          key.xlab = "Gene Expression (Z-score)", # Color Scale X-label
+          # main = "Genes Regulated by Torsin RNAi",
           ylab = "Genes",
           xlab = "Samples",
           
           # Clustering
           Rowv=rc, # row dendogram
           Colv=F, # don't reorder columns
-          dendrogram = "row", # draw only row dendogram
+          dendrogram = "row", # draw no dendogram
           
-          margins = c(6,2)
+          margins = c(2,2)
           
           )
+
+# Set legend
+legend(x=.25, y=1.3, # Legend poisition
+    legend = c( # Legend labels
+      'N2 EV',
+      'N2 tor-2',
+      'AM140 EV',
+      'AM140 tor-2',
+      'CL2006 EV',
+      'CL2006 tor-2'
+    ),
+    col = col.lab,# Label colors
+    lty= 1, # Label line type
+    lwd = 5, # Label line width
+    cex=.7, # Label text size
+    ncol = 3 # Organize into 3 columns
+    )
 
 dev.off()
 ```
 
 # Gene Tables
 
+## Load Dataframes (**checkpoint**).
+```{r load-data}
+# load("data/import-clean-ge.Rdata")
+# load("data/heatmap.Rdata")
+```
+
 Focus on differentially expressed genes and renname columns
 ```{r de-rename}
 tab <- ge %>% 
   filter(`Gene ID` %in% goi) %>% 
-  rename(Gene_Name = `gene name`,
-         Gene_ID = `Gene ID`,
-         log2FC = `log2FoldChange Treated vs untreated`,
-         FDR_adj_pvalue = `padj Treated vs untreated`) %>%
-  select(-baseMean)
+  dplyr::rename(Gene_Name = `gene name`,
+                Gene_ID = `Gene ID`,
+                log2FC = `log2FoldChange Treated vs untreated`,
+                FDR_adj_pvalue = `padj Treated vs untreated`) %>%
+  dplyr::select(-baseMean)
 ```
 
 Combined table for all three strains, up- and down-regulated genes.
