@@ -520,13 +520,19 @@ save(gosl_ann, file = "data/2019-05-21-GO-annotations.Rdata")
 load("data/2019-05-21-GO-annotations.Rdata",verbose = TRUE)
 ```
 
+## Process GO-Slim annotations
+
 View possible GO terms categories
 ```{r go-categories}
 levels(factor(gosl_ann$namespace_1003))
 ```
 
+The "IEA"-labelled GO terms correspond to annotations that were automatically determined, with _no experimental support_. Therefore, it is excluded. **Consider keeping**.
+```{r iea-exclude}
+gosl_ann <- filter(gosl_ann,go_linkage_type != "IEA")
 ```
-## Parse GO terms for input to GSEA
+
+### Parse GO-Slim annotations as list for input to GSEA
 
 The goal here is to separate the GO terms of the three GO categories ...
 - biological_process
@@ -534,16 +540,10 @@ The goal here is to separate the GO terms of the three GO categories ...
 - cellular_component
 
 ... and generate lists, in which each vector of gene IDs is named by the GO term and its accession number.
-```
 
-The "IEA"-labelled GO terms correspond to annotations that were automatically determined, with _no experimental support_. Therefore, it is excluded. **Consider keeping**
-```{r iea-exclude}
-gosl_ann <- filter(gosl_ann,go_linkage_type != "IEA")
-```
-
-Extract GO annotations that are under *Biological Process*.
+Extract GO-Slim annotations that are under *Biological Process*.
 ```{r parse-bp}
-bp <- go_ann %>% filter(namespace_1003 == "biological_process")
+bp <- gosl_ann %>% filter(namespace_1003 == "biological_process")
 
 bp <- split(bp$ensembl_gene_id,paste(bp$go_id,bp$name_1006))
 bp <- lapply(bp, unique) # Removing gene IDs that are repeated under a term.
@@ -551,7 +551,7 @@ bp <- lapply(bp, unique) # Removing gene IDs that are repeated under a term.
 
 Extract GO annotations that are under *Molecular Function*.
 ```{r parse-mf}
-mf <- go_ann %>% filter(namespace_1003 == "molecular_function")
+mf <- gosl_ann %>% filter(namespace_1003 == "molecular_function")
 
 mf <- split(mf$ensembl_gene_id,paste(mf$go_id,mf$name_1006))
 mf <- lapply(mf, unique) # Removing gene IDs that are repeated under a term.
@@ -559,34 +559,32 @@ mf <- lapply(mf, unique) # Removing gene IDs that are repeated under a term.
 
 Extract GO annotations that are under *Cellular Component*.
 ```{r parse-cc}
-cc <- go_ann %>% filter(namespace_1003 == "cellular_component")
+cc <- gosl_ann %>% filter(namespace_1003 == "cellular_component")
 
 cc <- split(cc$ensembl_gene_id,paste(cc$go_id,cc$name_1006))
 cc <- lapply(cc, unique) # Removing gene IDs that are repeated under a term.
 ```
 
-## Perform GO-GSEA
+## Run GO-GSEA
 Using the package **fgsea** to perform GSEA, focusing on medium-sized gene-sets (with 15-500 members), 10,000 permutations.
 ```{r gsea-parameters}
 minSize <- 15
 maxSize <- 500
 nperm <- 10000
-```
 
-```{r results-summary}
 res <- data.frame()
 ```
 
-### BP
+### Biological Process (BP)
 ```{r BP-N2}
 strain <- "N2"
 pathways_name <- "Biological Process"
-ranked <- ranked_n2
+ranked_genes <- ranked$N2
 pathways <- bp
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -602,12 +600,12 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 ```{r BP-AM140}
 strain <- "AM140"
 pathways_name <- "Biological Process"
-ranked <- ranked_am
+ranked_genes <- ranked$AM140
 pathways <- bp
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -623,12 +621,12 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 ```{r BP-CL2006}
 strain <- "CL2006"
 pathways_name <- "Biological Process"
-ranked <- ranked_cl
+ranked_genes <- ranked$CL2006
 pathways <- bp
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -641,16 +639,16 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
   bind_rows(res)
 ```
 
-### MF
+### Molecular Function (MF)
 ```{r MF-N2}
 strain <- "N2"
 pathways_name <- "Molecular Function"
-ranked <- ranked_n2
+ranked_genes <- ranked$N2
 pathways <- mf
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -666,12 +664,12 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 ```{r MF-AM140}
 strain <- "AM140"
 pathways_name <- "Molecular Function"
-ranked <- ranked_am
+ranked_genes <- ranked$AM140
 pathways <- mf
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -687,12 +685,12 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 ```{r MF-CL2006}
 strain <- "CL2006"
 pathways_name <- "Molecular Function"
-ranked <- ranked_cl
+ranked_genes <- ranked$CL2006
 pathways <- mf
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -705,16 +703,16 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
   bind_rows(res)
 ```
 
-### CC
+### Cellular Component (CC)
 ```{r CC-N2}
 strain <- "N2"
 pathways_name <- "Cellular Component"
-ranked <- ranked_n2
+ranked_genes <- ranked$N2
 pathways <- cc
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -730,12 +728,12 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 ```{r CC-AM140}
 strain <- "AM140"
 pathways_name <- "Cellular Component"
-ranked <- ranked_am
+ranked_genes <- ranked$AM140
 pathways <- cc
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -751,12 +749,12 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 ```{r CC-CL2006}
 strain <- "CL2006"
 pathways_name <- "Cellular Component"
-ranked <- ranked_cl
+ranked_genes <- ranked$CL2006
 pathways <- cc
 
 set.seed(159159)
 fgseaRes <- fgsea(pathways = pathways, 
-                  stats = ranked,
+                  stats = ranked_genes,
                   minSize = minSize,
                   maxSize = maxSize,
                   nperm = nperm)
@@ -773,8 +771,7 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 
 Save the results of the GSEA
 ```{r save-gsea}
-save(res, 
-     file = paste0("results/",today,"-gsea",".Rdata"))
+save(res,file = "data/2019-05-21-GOSlim-GSEA.Rdata")
 
 # Convert the column of gene names that are associated to each GO term from 
 # a list of strings, to a string.
@@ -783,78 +780,8 @@ res$leadingEdge <- sapply(res$leadingEdge,
 
 # Reorder the columns
 res <- res %>% dplyr::select(strain,GO_category,everything())
-write_csv(x = res,path = paste0("results/",today,"-gsea",".csv"))
+write_csv(x = res,path = "results/2019-05-21-GOSlim-GSEA.csv")
 ```
-
-# Gene lists tables
-
-Focus on differentially expressed genes and renname columns
-```{r}
-tab <- ge %>% 
-  filter(`Gene ID` %in% goi) %>% 
-  rename(Gene_Name = `gene name`,
-         Gene_ID = `Gene ID`,
-         log2FC = `log2FoldChange Treated vs untreated`,
-         FDR_adj_pvalue = FDR_adj_pvalue) %>%
-  select(-baseMean)
-```
-
-Combined table for all three strains, up- and down-regulated genes.
-```{r}
-tab %>% 
-  gather(score,quant,log2FC,FDR_adj_pvalue) %>%
-  unite(score,strain,score,sep = "_") %>%
-  spread(score,quant) %>%
-  select(Gene_ID,Gene_Name,N2_log2FC,N2_FDR_adj_pvalue,AM140_log2FC,AM140_FDR_adj_pvalue,
-         CL2006_log2FC,CL2006_FDR_adj_pvalue) %>% # Reorder columns
-  write_excel_csv(path = "results/gene_lists/genes_list.csv")
-```
-
-Table for each strain, up- or down-regulated, individualy.
-```{r}
-# N2 upregulated
-tab %>% filter(strain == 'N2',
-               FDR_adj_pvalue < 0.1,
-               log2FC > 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/N2_upreg.csv")
-
-# N2 downregulated
-tab %>% filter(strain == 'N2',
-               FDR_adj_pvalue < 0.1,
-               log2FC < 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/N2_dnreg.csv")
-
-# AM140 upregulated
-tab %>% filter(strain == 'AM140',
-               FDR_adj_pvalue < 0.1,
-               log2FC > 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/AM140_upreg.csv")
-
-# AM140 downregulated
-tab %>% filter(strain == 'AM140',
-               FDR_adj_pvalue < 0.1,
-               log2FC < 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/AM140_dnreg.csv")
-  
-# CL2006 upregulated
-tab %>% filter(strain == 'CL2006',
-               FDR_adj_pvalue < 0.1,
-               log2FC > 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/CL2006_upreg.csv")
-
-# CL2006  downregulated
-tab %>% filter(strain == 'CL2006',
-               FDR_adj_pvalue < 0.1,
-               log2FC < 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/CL2006_dnreg.csv")
-```
-
 
 ```{r session-info}
 sessionInfo()
