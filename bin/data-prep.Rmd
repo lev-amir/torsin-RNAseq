@@ -443,136 +443,43 @@ dev.off()
 
 # Gene Tables
 
-## Load Dataframes (**checkpoint**).
-```{r load-data}
-# load("data/import-clean-ge.Rdata")
-# load("data/heatmap.Rdata")
-```
 
-Focus on differentially expressed genes and renname columns
-```{r de-rename}
-tab <- gepc_tested %>% 
-  filter(`Gene ID` %in% goi) %>% 
-  dplyr::rename(Gene_Name = `gene name`,
-                Gene_ID = `Gene ID`,
-                log2FC = `log2FoldChange Treated vs untreated`,
-                FDR_p = FDR_adj_pvalue) %>%
-  dplyr::select(-baseMean)
-```
 
-Combined table for all three strains, up- and down-regulated genes.
-```{r combine-strains}
-tab %>% 
-  gather(score,quant,log2FC,FDR_adj_pvalue) %>%
-  unite(score,strain,score,sep = "_") %>%
-  spread(score,quant) %>%
-  select(Gene_ID,Gene_Name,N2_log2FC,N2_FDR_adj_pvalue,AM140_log2FC,AM140_FDR_adj_pvalue,
-         CL2006_log2FC,CL2006_FDR_adj_pvalue) %>% # Reorder columns
-  write_excel_csv(path = "results/gene_lists/genes_list.csv")
-```
-
-Table for each strain, up- or down-regulated, individualy. Save as CSV files. 
-```{r generate-de-tables}
-# N2 upregulated
-tab %>% filter(strain == 'N2',
-               FDR_adj_pvalue < 0.1,
-               log2FC > 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/N2_upreg.csv")
-
-# N2 downregulated
-tab %>% filter(strain == 'N2',
-               FDR_adj_pvalue < 0.1,
-               log2FC < 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/N2_dnreg.csv")
-
-# AM140 upregulated
-tab %>% filter(strain == 'AM140',
-               FDR_adj_pvalue < 0.1,
-               log2FC > 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/AM140_upreg.csv")
-
-# AM140 downregulated
-tab %>% filter(strain == 'AM140',
-               FDR_adj_pvalue < 0.1,
-               log2FC < 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/AM140_dnreg.csv")
-  
-# CL2006 upregulated
-tab %>% filter(strain == 'CL2006',
-               FDR_adj_pvalue < 0.1,
-               log2FC > 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/CL2006_upreg.csv")
-
-# CL2006  downregulated
-tab %>% filter(strain == 'CL2006',
-               FDR_adj_pvalue < 0.1,
-               log2FC < 0) %>%
-  arrange(FDR_adj_pvalue) %>%
-  write_excel_csv(path = "results/gene_lists/CL2006_dnreg.csv")
-```
-
-## Fetch attributes from BioMaRt
-## Gene Set Enrichment Analysis (GSEA)
-
-```{r}
-write(ge %>% filter(FDR_adj_pvalue < 0.1) %>% pull(`Gene ID`) %>% unique(),
-      file = "a.txt")
-```
-
-# GO GSEA (p<0.1)
+# GO GSEA
 Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
 
-## Load Dataframe (**checkpoint**).
-```{r load-data-gsea}
-load("data/import-clean-ge.Rdata", verbose = TRUE)
+## Load Dataframes (**checkpoint**).
+```{r load-data}
+# load("data/import-clean-ge.Rdata", verbose = TRUE)
+# load("data/heatmap.Rdata", verbose = TRUE)
 ```
-
-**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all the genes in the dataset.
 
 ## Generate a Ranked Gene List
 The ranked gene-list for the analysis needs to be ordered in a descending order by Fold-change. In the past, I tried ordering by *p*-values and by $-log10(p-value)*log_{2}(Fold-Change)$, but these didn't give meaningful results. I'll analyze the gene-lists from each strain independently. 
 **Split this into 3 analyses**.
 
-Return a vector of the Gene IDs for all the identified genes.
-```{r ranked-n2}
-strain <- "N2"
 
-ranked <- ge %>% 
-  dplyr::filter((!!strain) == strain) %>%
-  dplyr::arrange(desc(`log2FoldChange Treated vs untreated`))
 
-ranked <- setNames(ranked$`log2FoldChange Treated vs untreated`,ranked$`Gene ID`)
+## Fetch attributes from BioMaRt
+## Gene Set Enrichment Analysis (GSEA)
 
-ranked_n2 <- ranked
-```
+# GO GSEA (p<0.1)
 
-```{r ranked-am140}
-strain <- "AM140"
+**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all the genes in the dataset.
 
-ranked <- ge %>% 
-  dplyr::filter((!!strain) == strain) %>%
-  dplyr::arrange(desc(`log2FoldChange Treated vs untreated`))
+Create a list of vectors of the Gene IDs for all the identified genes, ranked.
+```{r ranked}
+ranked <- list()
 
-ranked <- setNames(ranked$`log2FoldChange Treated vs untreated`,ranked$`Gene ID`)
+strains = c("N2","AM140","CL2006")
 
-ranked_am <- ranked
-```
+for (strain in strains) {
+  df <- gepc_tested %>% 
+    dplyr::filter((!!strain) == strain) %>%
+    dplyr::arrange(desc(log2FC))
+  ranked[[eval(strain)]] <- setNames(df$log2FC,df$Gene_ID)
+}
 
-```{r ranked-cl2006}
-strain <- "CL2006"
-
-ranked <- ge %>% 
-  dplyr::filter((!!strain) == strain) %>%
-  dplyr::arrange(desc(`log2FoldChange Treated vs untreated`))
-
-ranked <- setNames(ranked$`log2FoldChange Treated vs untreated`,ranked$`Gene ID`)
-
-ranked_cl <- ranked
 ```
 
 ## Fetch Attributes from BioMaRt
