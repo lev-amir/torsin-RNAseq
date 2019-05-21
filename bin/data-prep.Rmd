@@ -17,19 +17,26 @@ results_dir = "../results/"
 data_dir = "../data/"
 ```
 
-## Import Packages
-```{r packages, results='hide'}
+## Packages
+Download and install. Only once. Packages defined in the next cell.
+```{r import-packages, results='hide'}
+install.packages(packages) # Install packages
+```
+
+```{r load-packages}
 packages <- c(
   "BiocManager","tidyverse",
   "VennDiagram","viridis", # Venn Diagram
   "gplots","RColorBrewer", # Heatmap plot
   "biomaRt","org.Ce.eg.db", # Gene Annotations
   "fgsea", # GSEA
-  "Cairo" # Export PDF/SVG
+  "Cairo", # Export PDF/SVG
+  "ggpubr" # Publication-quality plots arrangement
 )
-install.packages(packages) # Install packages
+
 lapply(packages, require, character.only = TRUE) # Load packages
 ```
+
 
 # Data Cleaning
 
@@ -221,7 +228,7 @@ rm(list = c("filename","title"))
 
 # Heatmap: differentially expressed genes
 
-## Data-prep 
+## Data-prep
 
 Vector of both up- and down-regulated genes (*p*-value < 0.1) to plot in heatmap.
 ```{r pool-regulated}
@@ -378,47 +385,65 @@ fc <-
   # order by difference between CL2006 and AM140 FC
   dplyr::arrange(desc(diff))
 
-fc$sign[fc$sign == 1] <- sprintf('\↑AM140 ↓CL2006')
+fc$sign[fc$sign == 1] <- sprintf('↑AM140 ↓CL2006')
 fc$sign[fc$sign == -1] <- sprintf('↓AM140 ↑CL2006')
 ```
 
 ## Plot
 ```{r plot}
 # dev.off()
-svg(filename = "results/2019-05-20-response-AM140-CL2006.svg",
+svg(filename = "results/2019-05-21-response-AM140-CL2006.svg",
           width = 3, 
-          height = 4,
-          pointsize = 3)
+          height = 4.5)
 
-
-fc[1:50,] %>% # Selected top 50 genes
-  ggplot( 
-  aes(x = reorder(Gene_Name, -diff), # Order by difference size
-      y = diff,
-      fill = sign)) + # Color by direction
+am_up <- fc %>%
+  dplyr::filter(sign =='↑AM140 ↓CL2006') %>%
+  ggplot(
+    aes(x = reorder(Gene_Name, -diff), # Order by difference size
+        y = diff
+    )
+  ) + 
   geom_col() + 
-  #ylab(
-  #  expression('|'~(log[2]~FC~AM140)-(log[2]~FC~CL2006)~'|')
-  #  ) + 
-  ylab('Response Difference') + # See above note for how calculated
-  xlab('') + 
-  labs(fill = "Torsin RNAi effect") + # Legend title
+  ylab(NULL) + # See above note for how calculated
+  xlab(NULL) + 
+  ggtitle('↑AM140 ↓CL2006') + 
   coord_flip() + # 90 degrees flip
   theme_classic() + 
-  
   # Removes the space between the x-axis labels and zero values
-  scale_y_continuous(expand = c(0,0)) + 
-  #theme(panel.grid = element_blank(), panel.border = element_blank()) + 
-  theme(legend.position = c(.8,.9),
-        text = element_text(size=7)) +  # font size of entire plot
-  guides(fill=guide_legend(keywidth=0.1, # Space between legend items
-                           keyheight=0.1,
-                           default.unit="inch")) + 
-  scale_fill_grey(start = 0.2, end = 0.8) # Colors used
+  scale_y_continuous(expand = c(0,0)) +
+  theme(text = element_text(size=7,color='black'),
+        plot.margin = unit(c(0,1,0,0), 'lines')) # font of entire plot
+
+am_dn <- fc %>%
+  dplyr::filter(sign =='↓AM140 ↑CL2006') %>%
+  ggplot(
+    aes(x = reorder(Gene_Name, -diff), # Order by difference size
+        y = diff
+    )
+  ) + 
+  geom_col() + 
+  ylab(NULL) + # See above note for how calculated
+  xlab(NULL) + 
+  ggtitle('↓AM140 ↑CL2006') +
+  coord_flip() + # 90 degrees flip
+  theme_classic() + 
+  # Removes the space between the x-axis labels and zero values
+  scale_y_continuous(expand = c(0,0)) +
+  theme(text = element_text(size=7,color='black'),
+        plot.margin = unit(c(0,1,0,0), 'lines')) # font of entire plot
+
+figure <- ggarrange(am_up,am_dn,
+                    ncol = 2, nrow = 1,
+                    hjust=c(0,4))
+annotate_figure(figure,
+                bottom = text_grob("Response Difference",face="bold",size = 7))
 
 dev.off()
 ```
 
+  theme(legend.position = c(.8,.9),
+        text = element_text(size=7)) +  # font size of entire plot
+  
 
 **STOPPED HERE**
 
