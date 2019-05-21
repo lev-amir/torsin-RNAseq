@@ -511,24 +511,21 @@ gosl_ann <- getBM(attributes = att,
 **STopped here**
 The process takes a while, so save the data for faster future run-times.
 ```{r save-annotations}
-save(go_ann,gosl_ann, file = "data/2019-01-24-GO-annotations.Rdata")
+save(gosl_ann, file = "data/2019-05-21-GO-annotations.Rdata")
+#save(go_ann,gosl_ann, file = "data/2019-01-24-GO-annotations.Rdata")
 ```
 
 ## GSEA
 ```{r load-annotations}
-load("data/2019-01-24-GO-annotations.Rdata",verbose = TRUE)
+load("data/2019-05-21-GO-annotations.Rdata",verbose = TRUE)
 ```
 
 View possible GO terms categories
 ```{r go-categories}
-levels(factor(go_ann$namespace_1003))
-```
-Looked further into "" and "eco", very few terms. Can ignore.
-```{r unknown-categories}
-go_ann[go_ann$namespace_1003 == "" & go_ann$go_id != "",]
-go_ann[go_ann$namespace_1003 == "eco",]
+levels(factor(gosl_ann$namespace_1003))
 ```
 
+```
 ## Parse GO terms for input to GSEA
 
 The goal here is to separate the GO terms of the three GO categories ...
