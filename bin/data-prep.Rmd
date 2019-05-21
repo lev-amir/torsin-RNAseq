@@ -534,10 +534,11 @@ The goal here is to separate the GO terms of the three GO categories ...
 - cellular_component
 
 ... and generate lists, in which each vector of gene IDs is named by the GO term and its accession number.
+```
 
-The "IEA"-labelled GO terms correspond to annotations that were automatically determined, with no experimental support. Therefore, it is excluded.
+The "IEA"-labelled GO terms correspond to annotations that were automatically determined, with _no experimental support_. Therefore, it is excluded. **Consider keeping**
 ```{r iea-exclude}
-go_ann <- filter(go_ann,go_linkage_type != "IEA")
+gosl_ann <- filter(gosl_ann,go_linkage_type != "IEA")
 ```
 
 Extract GO annotations that are under *Biological Process*.
