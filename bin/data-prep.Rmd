@@ -441,12 +441,6 @@ annotate_figure(figure,
 dev.off()
 ```
 
-  theme(legend.position = c(.8,.9),
-        text = element_text(size=7)) +  # font size of entire plot
-  
-
-**STOPPED HERE**
-
 # Gene Tables
 
 ## Load Dataframes (**checkpoint**).
@@ -455,12 +449,9 @@ dev.off()
 # load("data/heatmap.Rdata")
 ```
 
-
-
 Focus on differentially expressed genes and renname columns
 ```{r de-rename}
-# Change ge to gepc_tested or gepc_read
-tab <- ge %>% 
+tab <- gepc_tested %>% 
   filter(`Gene ID` %in% goi) %>% 
   dplyr::rename(Gene_Name = `gene name`,
                 Gene_ID = `Gene ID`,
