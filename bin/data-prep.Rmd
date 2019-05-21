@@ -458,16 +458,8 @@ Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
 The ranked gene-list for the analysis needs to be ordered in a descending order by Fold-change. In the past, I tried ordering by *p*-values and by $-log10(p-value)*log_{2}(Fold-Change)$, but these didn't give meaningful results. I'll analyze the gene-lists from each strain independently. 
 **Split this into 3 analyses**.
 
-
-
-## Fetch attributes from BioMaRt
-## Gene Set Enrichment Analysis (GSEA)
-
-# GO GSEA (p<0.1)
-
-**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all the genes in the dataset.
-
 Create a list of vectors of the Gene IDs for all the identified genes, ranked.
+**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all the genes in the dataset.
 ```{r ranked}
 ranked <- list()
 
@@ -479,11 +471,15 @@ for (strain in strains) {
     dplyr::arrange(desc(log2FC))
   ranked[[eval(strain)]] <- setNames(df$log2FC,df$Gene_ID)
 }
-
 ```
 
-## Fetch Attributes from BioMaRt
+## Fetch attributes from BioMaRt
+Load the biomart data
+```{r load-biomart}
+load("data/2019-01-24-GO-annotations.Rdata",verbose = TRUE)
+```
 
+No need to run if the biomart data loaded unchanged.
 ```{r biomart-object}
 mart = useMart(biomart="ensembl", dataset="celegans_gene_ensembl")
 ```
@@ -512,14 +508,13 @@ gosl_ann <- getBM(attributes = att,
                   filters=list(biotype='protein_coding'),
                   mart=mart)
 ```
-
+**STopped here**
 The process takes a while, so save the data for faster future run-times.
 ```{r save-annotations}
 save(go_ann,gosl_ann, file = "data/2019-01-24-GO-annotations.Rdata")
 ```
 
-## Process GO Terms
-
+## GSEA
 ```{r load-annotations}
 load("data/2019-01-24-GO-annotations.Rdata",verbose = TRUE)
 ```
