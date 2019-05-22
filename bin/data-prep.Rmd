@@ -441,37 +441,9 @@ annotate_figure(figure,
 dev.off()
 ```
 
-# Gene Tables
-
-
 
 # GO GSEA
 Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
-
-## Load Dataframes (**checkpoint**).
-```{r load-data}
-# load("data/import-clean-ge.Rdata", verbose = TRUE)
-# load("data/heatmap.Rdata", verbose = TRUE)
-```
-
-## Generate a Ranked Gene List
-The ranked gene-list for the analysis needs to be ordered in a descending order by Fold-change. In the past, I tried ordering by *p*-values and by $-log10(p-value)*log_{2}(Fold-Change)$, but these didn't give meaningful results. I'll analyze the gene-lists from each strain independently. 
-**Split this into 3 analyses**.
-
-Create a list of vectors of the Gene IDs for all the identified genes, ranked.
-**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all the genes in the dataset.
-```{r ranked}
-ranked <- list()
-
-strains = c("N2","AM140","CL2006")
-
-for (strain in strains) {
-  df <- gepc_tested %>% 
-    dplyr::filter((!!strain) == strain) %>%
-    dplyr::arrange(desc(log2FC))
-  ranked[[eval(strain)]] <- setNames(df$log2FC,df$Gene_ID)
-}
-```
 
 ## Fetch attributes from BioMaRt
 Load the biomart data
@@ -508,11 +480,34 @@ gosl_ann <- getBM(attributes = att,
                   filters=list(biotype='protein_coding'),
                   mart=mart)
 ```
-**STopped here**
+
 The process takes a while, so save the data for faster future run-times.
 ```{r save-annotations}
 save(gosl_ann, file = "data/2019-05-21-GO-annotations.Rdata")
 #save(go_ann,gosl_ann, file = "data/2019-01-24-GO-annotations.Rdata")
+```
+
+## Generate a Ranked Gene List
+The ranked gene-list for the analysis needs to be ordered in a descending order by Fold-change. In the past, I tried ordering by *p*-values and by $-log_{10}(p-value)*log_{2}(FC)$, but these didn't give meaningful results. I'll analyze the gene-lists from each strain independently: **three analyses**.
+
+### Load Dataframes (**checkpoint**).
+```{r load-data}
+load("data/import-clean-ge.Rdata", verbose = TRUE)
+```
+
+Create a list of vectors of the Gene IDs for all the identified genes, ranked.
+**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all measured genes (incl. low reads) in the dataset.
+```{r ranked}
+ranked <- list()
+
+strains = c("N2","AM140","CL2006")
+
+for (strain in strains) {
+  df <- gepc_read %>% 
+    dplyr::filter((!!strain) == strain) %>%
+    dplyr::arrange(desc(log2FC))
+  ranked[[eval(strain)]] <- setNames(df$log2FC,df$Gene_ID)
+}
 ```
 
 ## GSEA
@@ -771,7 +766,7 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 
 Save the results of the GSEA
 ```{r save-gsea}
-save(res,file = "data/2019-05-21-GOSlim-GSEA.Rdata")
+save(res,file = "data/2019-05-21-GOSlim-GSEA-lowcount-w-IEA.Rdata")
 
 # Convert the column of gene names that are associated to each GO term from 
 # a list of strings, to a string.
@@ -780,7 +775,7 @@ res$leadingEdge <- sapply(res$leadingEdge,
 
 # Reorder the columns
 res <- res %>% dplyr::select(strain,GO_category,everything())
-write_csv(x = res,path = "results/2019-05-21-GOSlim-GSEA.csv")
+write_csv(x = res,path = "results/2019-05-21-GOSlim-GSEA-lowcount-w-IEA.csv")
 ```
 
 ```{r session-info}
