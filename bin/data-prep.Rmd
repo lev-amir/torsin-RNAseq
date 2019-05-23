@@ -28,7 +28,7 @@ packages <- c(
   "BiocManager","tidyverse",
   "VennDiagram","viridis", # Venn Diagram
   "gplots","RColorBrewer", # Heatmap plot
-  "biomaRt","org.Ce.eg.db", # Gene Annotations
+  "biomaRt", # Gene Annotations
   "fgsea", # GSEA
   "Cairo", # Export PDF/SVG
   "ggpubr" # Publication-quality plots arrangement
@@ -288,15 +288,15 @@ Based on [1](https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/r/hea
 ```{r plot-heatmap}
 # dev.off()
 svg(file = "results/2019-05-20-heatmap.svg",
-                  width = 4, 
-                  height = 3,
-                  pointsize = 9)
+    width = 4, 
+    height = 3,
+    pointsize = 9)
 
 # par$xpd=FALSE by default
 par(xpd=TRUE)
 
 heatmap.2(x = z_mat, # data
-
+          
           # Colors
           colsep = c(8,15), # Separate columns by strain
           
@@ -335,24 +335,24 @@ heatmap.2(x = z_mat, # data
           
           margins = c(2,2)
           
-          )
+)
 
 # Set legend
 legend(x=.25, y=1.3, # Legend poisition
-    legend = c( # Legend labels
-      'N2 EV',
-      'N2 tor-2',
-      'AM140 EV',
-      'AM140 tor-2',
-      'CL2006 EV',
-      'CL2006 tor-2'
-    ),
-    col = col.lab,# Label colors
-    lty= 1, # Label line type
-    lwd = 5, # Label line width
-    cex=.7, # Label text size
-    ncol = 3 # Organize into 3 columns
-    )
+       legend = c( # Legend labels
+         'N2 EV',
+         'N2 tor-2',
+         'AM140 EV',
+         'AM140 tor-2',
+         'CL2006 EV',
+         'CL2006 tor-2'
+       ),
+       col = col.lab,# Label colors
+       lty= 1, # Label line type
+       lwd = 5, # Label line width
+       cex=.7, # Label text size
+       ncol = 3 # Organize into 3 columns
+)
 
 dev.off()
 ```
@@ -446,10 +446,6 @@ dev.off()
 Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
 
 ## Fetch attributes from BioMaRt
-Load the biomart data
-```{r load-biomart}
-load("data/2019-01-24-GO-annotations.Rdata",verbose = TRUE)
-```
 
 No need to run if the biomart data loaded unchanged.
 ```{r biomart-object}
@@ -490,13 +486,12 @@ save(gosl_ann, file = "data/2019-05-21-GO-annotations.Rdata")
 ## Generate a Ranked Gene List
 The ranked gene-list for the analysis needs to be ordered in a descending order by Fold-change. In the past, I tried ordering by *p*-values and by $-log_{10}(p-value)*log_{2}(FC)$, but these didn't give meaningful results. I'll analyze the gene-lists from each strain independently: **three analyses**.
 
-### Load Dataframes (**checkpoint**).
+Load Dataframes (**checkpoint**).
 ```{r load-data}
 load("data/import-clean-ge.Rdata", verbose = TRUE)
 ```
 
-Create a list of vectors of the Gene IDs for all the identified genes, ranked.
-**Note:** The analysis is done only to genes that passed the p-adjusted criteria. Need to do this to all measured genes (incl. low reads) in the dataset.
+Create a list of vectors of the Gene IDs for all the identified genes (incl. low reads), ranked.
 ```{r ranked}
 ranked <- list()
 
@@ -510,21 +505,18 @@ for (strain in strains) {
 }
 ```
 
-## GSEA
+## BioMart annotations
 ```{r load-annotations}
 load("data/2019-05-21-GO-annotations.Rdata",verbose = TRUE)
 ```
 
 ## Process GO-Slim annotations
+The "IEA"-labelled GO terms correspond to annotations that were automatically determined electronically, with _no experimental support_. They are included in the analysis, though.
 
 View possible GO terms categories
 ```{r go-categories}
 levels(factor(gosl_ann$namespace_1003))
-```
-
-The "IEA"-labelled GO terms correspond to annotations that were automatically determined, with _no experimental support_. Therefore, it is excluded. **Consider keeping**.
-```{r iea-exclude}
-gosl_ann <- filter(gosl_ann,go_linkage_type != "IEA")
+# "biological_process" "cellular_component" "go" "molecular_function"
 ```
 
 ### Parse GO-Slim annotations as list for input to GSEA
@@ -764,6 +756,14 @@ res <- fgseaRes[order(pval),][padj < 0.05] %>%
 
 ## Export GSEA Results
 
+Change the results file variables to be factors, when relevant. for visualization.
+```{r to-factors}
+res$pathway <- factor(res$pathway)
+res$strain <- factor(res$strain)
+relevel(res$strain) <- c("N2","AM140","CL2006")
+res$GO_category <- factor(res$GO_category)
+```
+
 Save the results of the GSEA
 ```{r save-gsea}
 save(res,file = "data/2019-05-21-GOSlim-GSEA-lowcount-w-IEA.Rdata")
@@ -778,7 +778,147 @@ res <- res %>% dplyr::select(strain,GO_category,everything())
 write_csv(x = res,path = "results/2019-05-21-GOSlim-GSEA-lowcount-w-IEA.csv")
 ```
 
+## Plot GSEA
+```{r load-data}
+load("data/2019-05-21-GOSlim-GSEA-lowcount-w-IEA.Rdata")
+```
+
+Ignore the N2 strain. The comparison is between CL2006 and AM140.
+```{r remove N2}
+res_plot <- dplyr::filter(res,strain != "N2")
+```
+
+Plot the bar graph.
+```{r plot-gsea}
+# dev.off()
+svg(filename = "results/2019-05-22-GOSlim-GSEA.svg", # save file as svg
+          width = 4, 
+          height = 7)
+
+#### Biological Process
+
+bp <- res_plot %>% 
+  filter(GO_category == "Biological Process") %>%
+  ggplot(
+    aes(
+      x=reorder(pathway, -NES), # Order by NES
+      y=NES,
+      fill=strain
+    )
+  ) + 
+  scale_fill_grey(start = 0.2, end = 0.8) + 
+  geom_col(position = 'stack') +
+  ylab('Enrichment Score') + 
+  xlab('Gene Ontology Term') + 
+  ggtitle('Biological Process') + 
+  coord_flip() + # 90 degrees flip
+  theme_minimal() +
+  geom_hline(yintercept = 0,color = "black", size = 1) + # Add vertical line at x=0
+  theme(axis.line.x = element_line(color="black", size = 1), # add x axis line
+        text = element_text(size=7,color='black'), # change font size and color
+        legend.title = element_blank(), # remove legend title
+        legend.spacing.x = unit(5, 'points')) # space between legend elements
+
+#### Molecular Function
+
+mf <- res_plot %>% 
+  filter(GO_category == "Molecular Function") %>%
+  ggplot(
+    aes(
+      x=reorder(pathway, -NES), # Order by NES
+      y=NES,
+      fill=strain
+    )
+  ) + 
+  scale_fill_grey(start = 0.2, end = 0.8) + 
+  geom_col(position = 'stack') +
+  ylab('Enrichment Score') + # See above note for how calculated
+  xlab('Gene Ontology Term') + 
+  ggtitle('Molecular Function') + 
+  coord_flip() + # 90 degrees flip
+  theme_minimal() +
+  geom_hline(yintercept = 0,color = "black", size = 1) +
+  theme(axis.line.x = element_line(color="black", size = 1),
+        text = element_text(size=7,color='black'),
+        legend.title = element_blank(),
+        legend.spacing.x = unit(5, 'points'))
+
+#### Cellular Component
+
+cc <- res_plot %>% 
+  filter(GO_category == "Cellular Component") %>%
+  ggplot(
+    aes(
+      x=reorder(pathway, -NES), # Order by NES
+      y=NES,
+      fill=strain
+    )
+  ) + 
+  scale_fill_grey(start = 0.2, end = 0.8) + 
+  geom_col(position = 'stack') +
+  ylab('Enrichment Score') + # See above note for how calculated
+  xlab('Gene Ontology Term') + 
+  ggtitle('Cellular Component') + 
+  coord_flip() + # 90 degrees flip
+  theme_minimal() +
+  geom_hline(yintercept = 0,color = "black", size = 1) +
+  theme(axis.line.x = element_line(color="black", size = 1),
+        text = element_text(size=7,color='black'),
+        legend.title = element_blank(),
+        legend.spacing.x = unit(5, 'points'))
+
+# Arrage the plot in a vertical manner
+ggarrange(bp,mf,cc,
+          ncol = 1, nrow = 3,
+          common.legend = TRUE, # share the same legend
+          align = "v", # align the y axis
+          heights = c(2,1.6,2.5)) # set ratio of each graph so that bars have roughlt the same width.
+
+dev.off()
+```
+
+# Session Info
 ```{r session-info}
 sessionInfo()
 ```
+```
+R version 3.5.3 (2019-03-11)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+Running under: Windows >= 8 x64 (build 9200)
 
+Matrix products: default
+
+locale:
+[1] C
+
+attached base packages:
+ [1] parallel  stats4    grid      stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] bindrcpp_0.2.2       ggpubr_0.2           magrittr_1.5         Cairo_1.5-10        
+ [5] fgsea_1.8.0          Rcpp_0.12.19         org.Ce.eg.db_3.6.0   AnnotationDbi_1.44.0
+ [9] IRanges_2.16.0       S4Vectors_0.20.0     Biobase_2.42.0       BiocGenerics_0.28.0 
+[13] biomaRt_2.38.0       RColorBrewer_1.1-2   gplots_3.0.1.1       viridis_0.5.1       
+[17] viridisLite_0.3.0    VennDiagram_1.6.20   futile.logger_1.4.3  forcats_0.3.0       
+[21] stringr_1.3.1        dplyr_0.7.7          purrr_0.2.5          readr_1.1.1         
+[25] tidyr_0.8.2          tibble_1.4.2         ggplot2_3.1.0        tidyverse_1.2.1     
+[29] BiocManager_1.30.4  
+
+loaded via a namespace (and not attached):
+ [1] nlme_3.1-137         bitops_1.0-6         lubridate_1.7.4      bit64_0.9-7         
+ [5] progress_1.2.0       httr_1.3.1           tools_3.5.3          backports_1.1.2     
+ [9] R6_2.3.0             KernSmooth_2.23-15   DBI_1.0.0            lazyeval_0.2.1      
+[13] colorspace_1.3-2     withr_2.1.2          tidyselect_0.2.5     gridExtra_2.3       
+[17] prettyunits_1.0.2    bit_1.1-14           compiler_3.5.3       cli_1.0.1           
+[21] rvest_0.3.2          formatR_1.5          xml2_1.2.0           labeling_0.3        
+[25] caTools_1.17.1.1     scales_1.0.0         digest_0.6.18        pkgconfig_2.0.2     
+[29] rlang_0.3.0.1        readxl_1.1.0         rstudioapi_0.8       RSQLite_2.1.1       
+[33] bindr_0.1.1          jsonlite_1.5         BiocParallel_1.16.0  gtools_3.8.1        
+[37] RCurl_1.95-4.11      Matrix_1.2-15        munsell_0.5.0        stringi_1.2.4       
+[41] yaml_2.2.0           plyr_1.8.4           blob_1.1.1           gdata_2.18.0        
+[45] crayon_1.3.4         lattice_0.20-38      cowplot_0.9.3        haven_1.1.2         
+[49] hms_0.4.2            knitr_1.20           pillar_1.3.0         futile.options_1.0.1
+[53] fastmatch_1.1-0      XML_3.98-1.16        glue_1.3.0           lambda.r_1.2.3      
+[57] data.table_1.11.8    modelr_0.1.2         cellranger_1.1.0     gtable_0.2.0        
+[61] assertthat_0.2.0     broom_0.5.0          memoise_1.1.0       
+```
