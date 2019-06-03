@@ -441,6 +441,81 @@ annotate_figure(figure,
 dev.off()
 ```
 
+## Top 10 tables
+
+### Fetch attributes from BioMaRt
+
+No need to run if the biomart data loaded unchanged.
+```{r biomart-object}
+mart = useMart(biomart="ensembl", dataset="celegans_gene_ensembl")
+```
+
+Fetch Gene-Ontology (GO) and GO-Slim annotations for *C. elegans*.
+```{r go-annotations}
+# Description attributes of interest
+att <- c("ensembl_gene_id",
+         "description")
+ann <- getBM(attributes = att, 
+             filters=list(biotype='protein_coding'),
+             mart=mart)
+```
+
+#### Save
+The process takes a while, so save the data for faster future run-times.
+```{r save-annotations}
+save(ann, file = "data/2019-06-03-gene-description-annotations.Rdata")
+```
+
+### Match descriptions
+```{r}
+fc$description <- ann$description[match(fc$Gene_ID, ann$ensembl_gene_id)]
+fc$description[fc$description == ""] <- NA
+```
+
+### Generate tables
+```{r}
+ColumnNames <- c(
+  "Gene Name",
+  "Ensembl Gene ID",
+  "Description",
+  #"N2 (log2FC)",
+  "AM140 (log2FC)",
+  "CL2006 (log2FC)",
+  "AM140-CL2006 difference"
+)
+
+
+am.up <- fc %>% 
+  dplyr::filter(fc$sign == "↑AM140 ↓CL2006") %>%
+  dplyr::select(Gene_Name,
+                Gene_ID,
+                description,
+                #N2_log2FC,
+                AM140_log2FC,
+                CL2006_log2FC,
+                diff)
+names(am.up) <- ColumnNames
+
+
+
+am.dn <- fc %>%
+  filter(fc$sign == "↓AM140 ↑CL2006") %>%
+  dplyr::select(Gene_Name,
+                Gene_ID,
+                description,
+                #N2_log2FC,
+                AM140_log2FC,
+                CL2006_log2FC,
+                diff)
+names(am.dn) <- ColumnNames
+```
+
+### Export tables
+```{r}
+write_csv(am.up[1:10,],path = "results/2019-06-03-top10-response-upAM140-dnCL2006.csv")
+write_csv(am.dn[1:10,],path = "results/2019-06-03-top10-response-dnAM140-upCL2006.csv")
+```
+
 
 # GO GSEA
 Gene Ontology (GO) Gene Set Enrichment Analysis (GSEA)
